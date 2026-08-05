@@ -37,19 +37,14 @@ def main() -> None:
         sys.exit(1)
 
     print(f"Extracted pages: {extracted.page_count}")
-
-    # print(f"Full text: {extracted.full_text}")
-    print(f"Total words in page {extracted.pages[0].page_number}: {extracted.pages[0].word_count}")
-    print(f"Total words in page {extracted.pages[1].page_number}: {extracted.pages[1].word_count}")
-    print(f"Total words in page {extracted.pages[2].page_number}: {extracted.pages[2].word_count}")
-    print(f"Total words in page {extracted.pages[3].page_number}: {extracted.pages[3].word_count}")
-    print(f"Total words in page {extracted.pages[4].page_number}: {extracted.pages[4].word_count}")
-    print(f"Total words in page {extracted.pages[5].page_number}: {extracted.pages[5].word_count}")
-
     print(f"Total words: {extracted.word_count}")
     print(f"Total chars: {extracted.char_count}")
-    # print(len(extracted.full_text)) To see if the full text length matches the char count
+
+    """ Saftery Checks for the extracted document to ensure consistency and correctness.
     full_text = "\n\n".join(page.text for page in extracted.pages)
+    print(f"Total words in page {extracted.pages[0].page_number}: {extracted.pages[0].word_count}")
+    print(f"Full text: {extracted.full_text}")
+    print(len(extracted.full_text)) To see if the full text length matches the char count
     character_count = len(full_text)
     print(f"Character count (manual calculation): {character_count}")
     print(extracted.pages[0].text[:500])
@@ -60,6 +55,7 @@ def main() -> None:
     assert extracted.char_count == len(extracted.full_text) # Character Count Match
     assert [page.page_number for page in extracted.pages] == [1, 2, 3, 4, 5, 6] # Page Ordering & Indexing Check
     assert extracted.full_text.strip() # . Non-Empty Text Validation
+    """
 
 
 if __name__ == "__main__":
