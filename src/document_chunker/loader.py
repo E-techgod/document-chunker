@@ -3,10 +3,8 @@ from pypdf.errors import PdfReadError
 
 from document_chunker.schemas import PDFDocumentInput
 
-
 class PDFLoadError(Exception):
     """Raised when a PDF cannot be opened, is corrupted, or cannot be decrypted."""
-
 
 def load_pdf(document: PDFDocumentInput, password: str = "") -> PdfReader:
     """Open and validate the PDF referenced by `document`.
@@ -16,13 +14,13 @@ def load_pdf(document: PDFDocumentInput, password: str = "") -> PdfReader:
     one page. Returns the opened `PdfReader` on success.
     """
     try:
-        reader = PdfReader(document.path)
+        reader = PdfReader(document.path) # Attempt to parse it with PdfReader
     except PdfReadError as exc:
         raise PDFLoadError(f"file is corrupted or not a valid PDF: {document.path}") from exc
 
     if reader.is_encrypted:
         try:
-            result = reader.decrypt(password)
+            result = reader.decrypt(password)  # Check encryption
         except NotImplementedError as exc:
             raise PDFLoadError(
                 f"file uses an unsupported encryption method: {document.path}"
@@ -33,11 +31,11 @@ def load_pdf(document: PDFDocumentInput, password: str = "") -> PdfReader:
             )
 
     try:
-        page_count = len(reader.pages)
+        page_count = len(reader.pages)  # Attempt to open the file 
     except PdfReadError as exc:
         raise PDFLoadError(f"file is corrupted or not a valid PDF: {document.path}") from exc
 
-    if page_count < 1:
+    if page_count < 1: # Check page count is greater than zero
         raise PDFLoadError(f"file contains no pages: {document.path}")
 
     return reader
