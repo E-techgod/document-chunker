@@ -1,68 +1,183 @@
 # `document-chunker`
 
-## Entry Point
-
-- Script entry point: [`main.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/main.py:1)
-- Callable entry function: `main()`
-- Package metadata file: [`pyproject.toml`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/pyproject.toml:1)
-- Console script entry points: none declared in `pyproject.toml`
-- Default PDF path when no CLI argument is provided: `data/generic.pdf`
-
-## Main Call Flow
-
-1. `main.py:main()` reads `sys.argv[1]` as `path` or defaults to `data/generic.pdf`.
-2. `main.py:main()` reads `sys.argv[2]` as `password` or defaults to `""`.
-3. `main.py:main()` constructs `PDFDocumentInput(path=Path(path))`.
-4. `PDFDocumentInput.validate_path()` checks that the path exists, is a file, has `.pdf` suffix, and is not empty.
-5. `main.py:main()` calls `load_pdf(document, password=password)`.
-6. `load_pdf()` constructs `PdfReader(document.path)`.
-7. `load_pdf()` decrypts the reader when `reader.is_encrypted` is true.
-8. `load_pdf()` checks `len(reader.pages) >= 1`.
-9. `main.py:main()` prints loaded path, encryption state, and page count.
-10. `main.py:main()` calls `extract_pdf(document, reader)`.
-11. `extract_pdf()` iterates `reader.pages` in order.
-12. `extract_pdf()` calls `page.extract_text()` for each page.
-13. `extract_pdf()` builds `ExtractDocumentPage` items with `page_number`, `text`, `word_count`, and `char_count`.
-14. `extract_pdf()` rejects the document when every page is blank or whitespace-only after extraction.
-15. `extract_pdf()` joins page text with `"\n\n"` into `full_text`.
-16. `extract_pdf()` returns `ExtractDocument`.
-17. `main.py:main()` prints extracted page count, total word count, and total char count.
-18. `main.py:main()` exits with status `1` on `ValidationError`, `PDFLoadError`, or `PDFExtractionError`.
-
-## Key Modules
-
-- [`main.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/main.py:1): CLI script; builds `PDFDocumentInput`; calls `load_pdf()` and `extract_pdf()`; prints summary values; handles `ValidationError`, `PDFLoadError`, and `PDFExtractionError`.
-- [`src/document_chunker/schemas.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/src/document_chunker/schemas.py:1): defines `PDFDocumentInput`, `ExtractDocumentPage`, `ExtractDocument`, `NormalizedPage`, and `NormalizedDocument`.
-- [`src/document_chunker/loader.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/src/document_chunker/loader.py:1): defines `PDFLoadError`; opens PDFs with `PdfReader`; handles corrupted PDFs, unsupported encryption, failed decryption, and zero-page PDFs.
-- [`src/document_chunker/extractor.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/src/document_chunker/extractor.py:1): defines `PDFExtractionError`; extracts per-page text; preserves blank pages; rejects documents with no extractable text; returns `ExtractDocument`.
-- [`tests/conftest.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/tests/conftest.py:1): defines `create_pdf` and `fake_reader` fixtures; defines `FakePage` and `FakeReader` test doubles.
-- [`tests/test_loader.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/tests/test_loader.py:1): tests `PDFDocumentInput` validation and `load_pdf()`.
-- [`tests/test_extractor.py`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/tests/test_extractor.py:1): tests `extract_pdf()`.
-
-## Test Count
-
-- Total test functions: `29`
-- `tests/test_loader.py`: `15`
-- `tests/test_extractor.py`: `14`
+## Package
+- Name: `document-chunker`
+- Version: `0.1.0`
+- Python: `>=3.14`
+- Build backend: `hatchling`
+- Wheel package target: `src/document_chunker`
 
 ## Dependencies
+- `pydantic>=2.13.4`
+- `pypdf>=6.14.2`
+- `pytest>=9.1.1`
 
-- Python requirement: `>=3.14`
-- Runtime dependencies:
-  - `pydantic>=2.13.4`
-  - `pypdf>=6.14.2`
-- Declared project dependency:
-  - `pytest>=9.1.1`
-- Build dependency:
-  - `hatchling`
+## Repository Files
+- `main.py`
+- `pyproject.toml`
+- `uv.lock`
+- `src/document_chunker/schemas.py`
+- `src/document_chunker/loader.py`
+- `src/document_chunker/extractor.py`
+- `tests/conftest.py`
+- `tests/test_loader.py`
+- `tests/test_extractor.py`
+- `graphify-out/GRAPH_REPORT.md`
+- `graphify-out/graph.html`
+- `graphify-out/graph.json`
+- `data/BAWSE.pdf`
+- `data/empty.pdf`
+- `data/generic.pdf`
+- `data/invoice.pdf`
+- `data/receipt.pdf`
+- `data/report.pdf`
+- `data/resume.pdf`
+- `data/sample.pdf`
 
-## Graph Facts
+## CLI
+- Entry file: `main.py`
+- Positional argument 1: PDF path
+- Positional argument 2: PDF password
+- Default PDF path: `data/generic.pdf`
+- Default password: `""`
+- Exit code `1` on `ValidationError`
+- Exit code `1` on `PDFLoadError`
+- Exit code `1` on `PDFExtractionError`
+- Prints loaded path, encryption flag, page count, extracted page count, total word count, total char count
 
-- Graph report file: [`graphify-out/GRAPH_REPORT.md`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/graphify-out/GRAPH_REPORT.md:1)
-- Graph HTML file: [`graphify-out/graph.html`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/graphify-out/graph.html:1)
-- Graph JSON file: [`graphify-out/graph.json`](/Users/eliasarellanocampos/EAC/Applied%20AI%20-%20GenAI%20Engineer%20@%20Austin/Week8/document-chunker/graphify-out/graph.json:1)
-- Graph nodes: `38`
-- Graph edges: `84`
-- Graph communities: `8`
-- Graph report commit reference: `4ceaacb1`
-- Graph report import cycles: none detected
+## Schemas
+
+### `PDFDocumentInput`
+- Base: `pydantic.BaseModel`
+- Fields:
+- `path: Path`
+- `document_id: str | None = None`
+- `document_type: str | None = None`
+- Path validation checks:
+- non-empty string after coercion check
+- path exists
+- path is a file
+- suffix is `.pdf`
+- file size is greater than `0`
+
+### `ExtractDocumentPage`
+- Base: `pydantic.BaseModel`
+- Fields:
+- `page_number: int` with `ge=1`
+- `text: str`
+- `word_count: int` with `ge=0`
+- `char_count: int` with `ge=0`
+
+### `ExtractDocument`
+- Base: `pydantic.BaseModel`
+- Fields:
+- `document_id: str`
+- `file_name: str`
+- `file_path: Path`
+- `document_type: str | None = None`
+- `page_count: int` with `ge=1`
+- `pages: list[ExtractDocumentPage]`
+- `full_text: str`
+- `word_count: int` with `ge=0`
+- `char_count: int` with `ge=0`
+
+### `NormalizedPage`
+- Base: `pydantic.BaseModel`
+- Fields:
+- `page_number: int` with `ge=1`
+- `text: str`
+- `word_count: int` with `ge=0`
+- `char_count: int` with `ge=0`
+
+### `NormalizedDocument`
+- Base: `pydantic.BaseModel`
+- Fields:
+- `document_id: str`
+- `file_name: str`
+- `file_path: Path`
+- `document_type: str | None = None`
+- `page_count: int` with `ge=1`
+- `pages: list[NormalizedPage]`
+- `full_text: str`
+- `word_count: int` with `ge=0`
+- `char_count: int` with `ge=0`
+- `normalized_strategy: str | None = None`
+
+## Loader
+- File: `src/document_chunker/loader.py`
+- Exception: `PDFLoadError`
+- Function: `load_pdf(document: PDFDocumentInput, password: str = "") -> PdfReader`
+- Uses: `pypdf.PdfReader`
+- Uses: `pypdf.errors.PdfReadError`
+- Behavior:
+- opens `document.path` with `PdfReader`
+- converts `PdfReadError` during open to `PDFLoadError`
+- if encrypted, calls `reader.decrypt(password)`
+- converts `NotImplementedError` during decrypt to `PDFLoadError`
+- raises `PDFLoadError` when decrypt result is `0`
+- reads `len(reader.pages)`
+- converts `PdfReadError` during page access to `PDFLoadError`
+- raises `PDFLoadError` when page count is less than `1`
+- returns `PdfReader`
+
+## Extractor
+- File: `src/document_chunker/extractor.py`
+- Exception: `PDFExtractionError`
+- Function: `extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractDocument`
+- Behavior:
+- iterates `reader.pages` in original order starting at page number `1`
+- calls `page.extract_text()`
+- converts `None` page text to `""`
+- converts page extraction exceptions to `PDFExtractionError`
+- preserves blank pages
+- rejects documents when every page is blank or whitespace-only
+- sets `full_text` to page texts joined by `"\n\n"`
+- sets `document_id` to `document.document_id` or `document.path.stem`
+- sets `file_name` to `document.path.name`
+- sets `file_path` to `document.path`
+- sets `document_type` to `document.document_type`
+- sets `page_count` to number of pages
+- sets `word_count` to sum of page word counts
+- sets `char_count` to `len(full_text)`
+- does not normalize extracted text
+
+## Tests
+
+### `tests/test_loader.py`
+- validates valid PDF path input
+- validates missing path rejection
+- validates empty path rejection
+- validates nonexistent path rejection
+- validates directory path rejection
+- validates non-`.pdf` extension rejection
+- validates zero-byte file rejection
+- validates optional metadata assignment
+- validates invalid `document_id` type rejection
+- validates successful loading of a 3-page PDF
+- validates corrupted PDF rejection
+- validates encrypted PDF rejection without password
+- validates encrypted PDF rejection with wrong password
+- validates encrypted PDF acceptance with correct password
+- validates zero-page PDF rejection
+
+### `tests/test_extractor.py`
+- validates one extracted page per input page
+- validates page ordering preservation
+- validates blank page preservation
+- validates `extract_text()` returning `None` as empty string
+- validates rejection when all pages return `None`
+- validates rejection when all pages are blank
+- validates rejection when all pages are whitespace-only
+- validates acceptance when at least one page has text
+- validates page extraction failure conversion to `PDFExtractionError`
+- validates `full_text` assembly with `"\n\n"`
+- validates page and document count fields
+- validates metadata preservation
+- validates default `document_id` from file stem
+- validates no text normalization
+
+### `tests/conftest.py`
+- fixture: `create_pdf(tmp_path)`
+- helper writes valid PDFs, encrypted PDFs, or raw byte files
+- fixture: `fake_reader()`
+- support classes: `FakePage`, `FakeReader`
