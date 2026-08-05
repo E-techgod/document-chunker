@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 
 
 class PDFDocumentInput(BaseModel):
@@ -26,10 +26,10 @@ class PDFDocumentInput(BaseModel):
         return path 
 
 class ExtractDocumentPage(BaseModel):
-    page_number: int
+    page_number: int = Field(ge=1)
     text: str
-    word_count: int
-    char_count: int
+    word_count: int =  Field(ge=0)
+    char_count: int =  Field(ge=0)
 
 class ExtractDocument(BaseModel):
     document_id: str
@@ -37,18 +37,18 @@ class ExtractDocument(BaseModel):
     file_path: Path
     document_type: str | None = None
 
-    page_count: int
+    page_count: int  = Field(ge=1)
     pages: list[ExtractDocumentPage]
 
     full_text: str
-    word_count: int
-    char_count: int
+    word_count: int  = Field(ge=0)
+    char_count: int = Field(ge=0)
 
 class NormalizedPage(BaseModel):
-    page_number: int
+    page_number: int  = Field(ge=1)
     text: str
-    word_count: int
-    char_count: int
+    word_count: int  = Field(ge=0)
+    char_count: int = Field(ge=0)
 
 class NormalizedDocument(BaseModel):
     document_id: str
@@ -56,11 +56,11 @@ class NormalizedDocument(BaseModel):
     file_path: Path
     document_type: str | None = None
 
-    page_count: int
+    page_count: int = Field(ge=1)
     pages: list[NormalizedPage]
 
     full_text: str
-    word_count: int
-    char_count: int
+    word_count: int = Field(ge=0)
+    char_count: int = Field(ge=0)
 
     normalized_strategy: str | None = None
