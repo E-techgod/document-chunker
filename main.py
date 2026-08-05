@@ -3,8 +3,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from src.document_chunker.loader import PDFDocumentInput, PDFLoadError, load_pdf
-
+from src.document_chunker.loader import PDFLoadError, load_pdf
+from src.document_chunker.schemas import PDFDocumentInput
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
