@@ -9,7 +9,7 @@ from src.document_chunker.schemas import PDFDocumentInput
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
-    path = sys.argv[1] if len(sys.argv) > 1 else "data/generic.pdf"
+    path = sys.argv[1] if len(sys.argv) > 1 else "data/sample.pdf"
     password = sys.argv[2] if len(sys.argv) > 2 else ""
 
     try:
@@ -25,6 +25,8 @@ def main() -> None:
         sys.exit(1)
 
     print(f"Loaded: {document.path}")
+    print(f"Document ID: {document.document_id or document.path.stem}")
+    print(f"Document Type: {document.document_type or 'Not provided'}")
     print(f"Encrypted: {reader.is_encrypted}")
     print(f"Pages: {len(reader.pages)}")
 
@@ -35,8 +37,29 @@ def main() -> None:
         sys.exit(1)
 
     print(f"Extracted pages: {extracted.page_count}")
+
+    # print(f"Full text: {extracted.full_text}")
+    print(f"Total words in page {extracted.pages[0].page_number}: {extracted.pages[0].word_count}")
+    print(f"Total words in page {extracted.pages[1].page_number}: {extracted.pages[1].word_count}")
+    print(f"Total words in page {extracted.pages[2].page_number}: {extracted.pages[2].word_count}")
+    print(f"Total words in page {extracted.pages[3].page_number}: {extracted.pages[3].word_count}")
+    print(f"Total words in page {extracted.pages[4].page_number}: {extracted.pages[4].word_count}")
+    print(f"Total words in page {extracted.pages[5].page_number}: {extracted.pages[5].word_count}")
+
     print(f"Total words: {extracted.word_count}")
     print(f"Total chars: {extracted.char_count}")
+    # print(len(extracted.full_text)) To see if the full text length matches the char count
+    full_text = "\n\n".join(page.text for page in extracted.pages)
+    character_count = len(full_text)
+    print(f"Character count (manual calculation): {character_count}")
+    print(extracted.pages[0].text[:500])
+    print(extracted.pages[0].text[-150:])
+    print(extracted.pages[1].text[:150])
+    assert extracted.page_count == len(extracted.pages) # Page Count Consistency Check
+    assert extracted.word_count == sum(page.word_count for page in extracted.pages) # Word Count Aggregation Check
+    assert extracted.char_count == len(extracted.full_text) # Character Count Match
+    assert [page.page_number for page in extracted.pages] == [1, 2, 3, 4, 5, 6] # Page Ordering & Indexing Check
+    assert extracted.full_text.strip() # . Non-Empty Text Validation
 
 
 if __name__ == "__main__":
