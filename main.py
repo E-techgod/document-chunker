@@ -6,12 +6,9 @@ from pydantic import ValidationError
 from src.document_chunker.loader import PDFDocumentInput, PDFLoadError, load_pdf
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <path-to-pdf> [password]")
-        sys.exit(1)
-
-    path = sys.argv[1]
+def main() -> None:
+    # Use CLI argument if provided; otherwise, fall back to default path
+    path = sys.argv[1] if len(sys.argv) > 1 else "data/generic.pdf"
     password = sys.argv[2] if len(sys.argv) > 2 else ""
 
     try:
