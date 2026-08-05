@@ -3,6 +3,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from src.document_chunker.extractor import PDFExtractionError, extract_pdf
 from src.document_chunker.loader import PDFLoadError, load_pdf
 from src.document_chunker.schemas import PDFDocumentInput
 
@@ -26,6 +27,16 @@ def main() -> None:
     print(f"Loaded: {document.path}")
     print(f"Encrypted: {reader.is_encrypted}")
     print(f"Pages: {len(reader.pages)}")
+
+    try:
+        extracted = extract_pdf(document, reader)
+    except PDFExtractionError as exc:
+        print(f"Failed to extract PDF: {exc}")
+        sys.exit(1)
+
+    print(f"Extracted pages: {extracted.page_count}")
+    print(f"Total words: {extracted.word_count}")
+    print(f"Total chars: {extracted.char_count}")
 
 
 if __name__ == "__main__":

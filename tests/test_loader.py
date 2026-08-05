@@ -6,32 +6,6 @@ from document_chunker.loader import PDFLoadError, load_pdf
 from document_chunker.schemas import PDFDocumentInput
 
 
-@pytest.fixture
-def create_pdf(tmp_path):
-    """Helper fixture to dynamically create test PDFs in a temporary folder."""
-
-    def _generator(filename="valid.pdf", pages=1, encrypt_password=None, raw_bytes=None):
-        file_path = tmp_path / filename
-
-        if raw_bytes is not None:
-            file_path.write_bytes(raw_bytes)
-            return file_path
-
-        writer = PdfWriter()
-        for _ in range(pages):
-            writer.add_blank_page(width=100, height=100)
-
-        if encrypt_password:
-            writer.encrypt(encrypt_password)
-
-        with open(file_path, "wb") as f:
-            writer.write(f)
-
-        return file_path
-
-    return _generator
-
-
 # --- PDFDocumentInput ---
 
 
