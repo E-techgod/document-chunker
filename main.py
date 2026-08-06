@@ -9,7 +9,7 @@ from src.document_chunker.normalizer import normalize_document, normalize_text
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
-    path = sys.argv[1] if len(sys.argv) > 1 else "data/BAWSE.pdf"
+    path = sys.argv[1] if len(sys.argv) > 1 else "data/sample.pdf"
     password = sys.argv[2] if len(sys.argv) > 2 else ""
 
     try:
@@ -78,3 +78,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+    

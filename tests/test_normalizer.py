@@ -47,6 +47,15 @@ def test_attaches_indented_continuation_lines_to_list_items() -> None:
     assert repair_line_wraps(text) == expected
 
 
+def test_attaches_indented_continuation_lines_to_numbered_list_items() -> None:
+    text = (
+        "1. Watching tutorials without building...\n"
+        "    on GitHub, you didn't do that week.\n"
+    )
+    expected = "1. Watching tutorials without building... on GitHub, you didn't do that week."
+    assert repair_line_wraps(text) == expected
+
+
 def test_stops_list_continuations_at_structural_boundaries() -> None:
     text = (
         "● First item\n"

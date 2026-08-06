@@ -21,7 +21,7 @@ _TRAILING_LINE_WHITESPACE_RE = re.compile(r"[ \t]+\n")
 _EXCESS_BLANK_LINES_RE = re.compile(r"\n{3,}")
 _SPACE_BEFORE_PUNCTUATION_RE = re.compile(r"[ \t]+([.,;:!?)\]}])")
 _SPACE_AFTER_OPEN_BRACKET_RE = re.compile(r"([(\[{])[ \t]+")
-_BULLET_RE = re.compile(r"^(?:[●•\-→]|\d+[.)])\s+")
+_LIST_ITEM_RE = re.compile(r"^(?:[●•\-→]|\d+[.)])\s+")
 _NUMERIC_ROW_RE = re.compile(r"^[\d$€£¥(),.%+\-/: ]+$")
 _SENTENCE_TERMINAL_RE = re.compile(r'[.!?]["\')\]]?$')
 _PIPE_SPLIT_TABLE_RE = re.compile(r"\s*\|\s*")
@@ -137,7 +137,7 @@ def _is_heading_like(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
         return False
-    if _BULLET_RE.match(stripped):
+    if _LIST_ITEM_RE.match(stripped):
         return False
     if len(stripped) <= 90 and stripped.endswith(":"):
         return True
@@ -156,7 +156,7 @@ def _is_heading_like(text: str) -> bool:
 
 
 def _is_table_candidate(text: str) -> bool:
-    if not text or _BULLET_RE.match(text):
+    if not text or _LIST_ITEM_RE.match(text):
         return False
     columns = _split_table_columns(text)
     if len(columns) < 2:
@@ -165,12 +165,16 @@ def _is_table_candidate(text: str) -> bool:
     return compact_columns >= 2
 
 
+def _is_list_item(text: str) -> bool:
+    return bool(_LIST_ITEM_RE.match(text))
+
+
 def _classify_line(text: str) -> ClassifiedLine:
     indent = _measure_indent(text)
     stripped = text.strip()
     if not stripped:
         return ClassifiedLine(text="", line_type="blank", indent=indent, raw_text=text)
-    if _BULLET_RE.match(stripped):
+    if _is_list_item(stripped):
         return ClassifiedLine(
             text=_normalize_inline_text(stripped),
             line_type="list_item",
@@ -378,9 +382,7 @@ def _build_list(lines: list[ClassifiedLine], start_index: int) -> tuple[Normaliz
 
         while continuation_index < len(lines):
             continuation = lines[continuation_index]
-            if continuation.line_type in {"blank", "list_item", "heading", "table_row"}:
-                break
-            if continuation.line_type != "text" or continuation.indent <= item.indent:
+            if not _is_list_continuation(item, continuation):
                 break
             item_parts.append(continuation.text)
             continuation_index += 1
@@ -389,6 +391,14 @@ def _build_list(lines: list[ClassifiedLine], start_index: int) -> tuple[Normaliz
         index = continuation_index
 
     return NormalizedBlock(block_type="list", items=items), index
+
+
+def _is_list_continuation(item: ClassifiedLine, continuation: ClassifiedLine) -> bool:
+    if continuation.line_type in {"blank", "list_item", "heading", "table_row"}:
+        return False
+    if continuation.line_type != "text":
+        return False
+    return continuation.indent > item.indent
 
 
 def _build_block_entries(text: str) -> list[BlockEntry]:
