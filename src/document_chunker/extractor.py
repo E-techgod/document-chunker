@@ -1,7 +1,7 @@
 from pypdf import PdfReader
 from pydantic import BaseModel
 
-from document_chunker.schemas import ExtractDocument, ExtractDocumentPage, PDFDocumentInput
+from document_chunker.schemas import ExtractedDocument, ExtractedPage, PDFDocumentInput
 
 
 class PDFExtractionError(Exception):
@@ -12,7 +12,20 @@ class ExtractionConfig(BaseModel):
     layout_mode_space_vertically: bool = False
 
 
-def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractDocument:
+def _extract_page_text(page: object, config: ExtractionConfig) -> str:
+    """Call `extract_text` with config when supported, otherwise fall back."""
+    extract_text = getattr(page, "extract_text")
+    kwargs = config.model_dump()
+
+    try:
+        return extract_text(**kwargs) or ""
+    except TypeError as exc:
+        if "unexpected keyword argument" not in str(exc):
+            raise
+        return extract_text() or ""
+
+
+def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractedDocument:
     """Extract raw per-page and full-document text from an opened PDF.
 
     Every page in `reader` gets a corresponding `ExtractDocumentPage`, in
@@ -21,19 +34,19 @@ def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractDocumen
     only if every page yields no text at all. Page text is taken as-is
     from pypdf; no normalization is applied here.
     """
-    pages: list[ExtractDocumentPage] = []
+    pages: list[ExtractedPage] = []
     config = ExtractionConfig()
 
     for page_number, page in enumerate(reader.pages, start=1):
         try:
-            text = page.extract_text(**config.model_dump()) or ""
+            text = _extract_page_text(page, config)
         except Exception as exc:
             raise PDFExtractionError(
                 f"failed to extract text from page {page_number}: {document.path}"
             ) from exc
 
         pages.append(
-            ExtractDocumentPage(
+            ExtractedPage(
                 page_number=page_number,
                 text=text,
                 word_count=len(text.split()),
@@ -46,7 +59,7 @@ def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractDocumen
 
     full_text = "\n\n".join(page.text for page in pages)
 
-    return ExtractDocument(
+    return ExtractedDocument(
         document_id=document.document_id or document.path.stem,
         file_name=document.path.name,
         file_path=document.path,

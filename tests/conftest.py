@@ -1,7 +1,8 @@
 import pytest
 from pypdf import PdfWriter
 
-from document_chunker.schemas import ExtractDocument, ExtractDocumentPage
+from document_chunker.normalizer import normalize_document
+from document_chunker.schemas import ExtractedDocument, ExtractedPage
 
 
 @pytest.fixture
@@ -84,7 +85,7 @@ def make_extract_document():
         document_type=None,
     ):
         pages = [
-            ExtractDocumentPage(
+            ExtractedPage(
                 page_number=i,
                 text=text,
                 word_count=len(text.split()),
@@ -93,7 +94,7 @@ def make_extract_document():
             for i, text in enumerate(texts, start=1)
         ]
         full_text = "\n\n".join(texts)
-        return ExtractDocument(
+        return ExtractedDocument(
             document_id=document_id,
             file_name=file_name,
             file_path=file_path,
@@ -106,3 +107,19 @@ def make_extract_document():
         )
 
     return _generator
+
+
+@pytest.fixture
+def normalized_doc(make_extract_document):
+    """Provide a representative normalized document for model/serialization tests."""
+    document = make_extract_document(
+        [
+            "  First page has   extra spacing.  ",
+            "Second page wraps\nacross lines.",
+        ],
+        document_id="normalized-doc",
+        file_name="normalized.pdf",
+        file_path="/tmp/normalized.pdf",
+        document_type="report",
+    )
+    return normalize_document(document)

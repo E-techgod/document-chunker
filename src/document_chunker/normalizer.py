@@ -3,12 +3,13 @@ from collections import Counter
 from dataclasses import dataclass
 
 from document_chunker.schemas import (
-    ExtractDocument,
-    ExtractDocumentPage,
+    ExtractedPage,
+    ExtractedDocument,
     NormalizedBlock,
     NormalizedDocument,
     NormalizedPage,
     NormalizedTable,
+    NormalizationStrategy,
 )
 
 # NBSP + the Unicode "space separator" block (en/em/thin/hair/ideographic spaces, etc.)
@@ -27,8 +28,7 @@ _NUMERIC_ROW_RE = re.compile(r"^[\d$€£¥(),.%+\-/: ]+$")
 _SENTENCE_TERMINAL_RE = re.compile(r'[.!?]["\')\]]?$')
 _SPLIT_TABLE_RE = re.compile(r"\s{2,}|\s+\|\s+")
 
-DEFAULT_NORMALIZATION_STRATEGY = "aggressive"
-
+DEFAULT_NORMALIZATION_STRATEGY: NormalizationStrategy = "structural"
 
 @dataclass(frozen=True)
 class ClassifiedLine:
@@ -245,7 +245,7 @@ def normalize_text(text: str) -> str:
     return repair_line_wraps(text).strip()
 
 
-def normalize_page(page: ExtractDocumentPage) -> NormalizedPage:
+def normalize_page(page: ExtractedPage) -> NormalizedPage:
     blocks = _build_blocks(page.text)
     text = _render_blocks(blocks)
     return NormalizedPage(
@@ -258,9 +258,10 @@ def normalize_page(page: ExtractDocumentPage) -> NormalizedPage:
 
 
 def normalize_document(
-    document: ExtractDocument, strategy: str = DEFAULT_NORMALIZATION_STRATEGY
+    document: ExtractedDocument,
+    strategy: NormalizationStrategy = DEFAULT_NORMALIZATION_STRATEGY,
 ) -> NormalizedDocument:
-    """Normalize an ExtractDocument page by page, preserving page boundaries, then recombine."""
+    """Normalize an ExtractedDocument page by page, preserving page boundaries, then recombine."""
     pages = [normalize_page(page) for page in document.pages]
     # Joining across a blank page produces "\n\n" + "" + "\n\n" (4 newlines);
     # collapse those back down so the combined text keeps rule 6/8's limit too.
@@ -274,7 +275,7 @@ def normalize_document(
         page_count=len(pages),
         pages=pages,
         full_text=full_text,
-        word_count=sum(page.word_count for page in pages),
+        word_count=len(full_text.split()),
         char_count=len(full_text),
         normalized_strategy=strategy,
     )

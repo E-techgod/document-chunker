@@ -1,8 +1,13 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, field_validator, Field, field_validator, computed_field
 
+NormalizationStrategy = Literal[
+    "conservative",
+    "structural",
+    "layout_preserving",
+]
 
 class PDFDocumentInput(BaseModel):
     """Validated input for loading a single PDF document."""
@@ -26,24 +31,42 @@ class PDFDocumentInput(BaseModel):
             raise ValueError(f"file is empty: {path}") # Check size is greater than zero
         return path 
 
-class ExtractDocumentPage(BaseModel):
+class ExtractedPage(BaseModel):
     page_number: int = Field(ge=1)
     text: str
-    word_count: int =  Field(ge=0)
-    char_count: int =  Field(ge=0)
+    
+    @computed_field
+    @property
+    def word_count(self) -> int:
+        return len(self.text.split())
 
-class ExtractDocument(BaseModel):
+    @computed_field
+    @property
+    def char_count(self) -> int:
+        return len(self.text)
+
+class ExtractedDocument(BaseModel):
     document_id: str
     file_name: str
     file_path: Path
     document_type: str | None = None
-
-    page_count: int  = Field(ge=1)
-    pages: list[ExtractDocumentPage]
-
+    pages: list[ExtractedPage]
     full_text: str
-    word_count: int  = Field(ge=0)
-    char_count: int = Field(ge=0)
+
+    @computed_field
+    @property
+    def page_count(self) -> int:
+        return len(self.pages)
+
+    @computed_field
+    @property
+    def word_count(self) -> int:
+        return len(self.full_text.split())
+
+    @computed_field
+    @property
+    def char_count(self) -> int:
+        return len(self.full_text)
 
 class NormalizedTable(BaseModel):
     header: list[str] = Field(default_factory=list)
@@ -58,23 +81,42 @@ class NormalizedBlock(BaseModel):
 
 
 class NormalizedPage(BaseModel):
-    page_number: int  = Field(ge=1)
+    page_number: int  = Field(ge=1) # Field level validation to ensure page_number is greater than or equal to 1
     text: str
-    word_count: int  = Field(ge=0)
-    char_count: int = Field(ge=0)
     blocks: list[NormalizedBlock] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def word_count(self) -> int:
+        return len(self.text.split())
+
+    @computed_field
+    @property
+    def char_count(self) -> int:
+        return len(self.text)
 
 class NormalizedDocument(BaseModel):
     document_id: str
     file_name: str
     file_path: Path
     document_type: str | None = None
-
-    page_count: int = Field(ge=1)
     pages: list[NormalizedPage]
-
     full_text: str
-    word_count: int = Field(ge=0)
-    char_count: int = Field(ge=0)
-
     normalized_strategy: str | None = None
+   
+    @computed_field
+    @property
+    def page_count(self) -> int:
+        return len(self.pages)
+
+    @computed_field
+    @property
+    def word_count(self) -> int:
+        return len(self.full_text.split())
+
+    @computed_field
+    @property
+    def char_count(self) -> int:
+        return len(self.full_text)
+
+

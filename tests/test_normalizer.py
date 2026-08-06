@@ -5,7 +5,7 @@ from document_chunker.normalizer import (
     normalize_text,
     repair_line_wraps
 )
-from document_chunker.schemas import ExtractDocumentPage
+from document_chunker.schemas import ExtractedPage, NormalizedDocument, NormalizedPage
 
 
 # --- normalize_text: one test per rule ---
@@ -137,7 +137,7 @@ def test_preserves_blank_line_paragraph_breaks_while_repairing_wraps():
 
 
 def test_normalize_page_recalculates_counts():
-    page = ExtractDocumentPage(page_number=1, text="  a    b  ", word_count=99, char_count=99)
+    page = ExtractedPage(page_number=1, text="  a    b  ", word_count=99, char_count=99)
     normalized = normalize_page(page)
     assert normalized.text == "a b"
     assert normalized.word_count == 2
@@ -146,13 +146,13 @@ def test_normalize_page_recalculates_counts():
 
 
 def test_normalize_page_preserves_page_number():
-    page = ExtractDocumentPage(page_number=7, text="text", word_count=1, char_count=4)
+    page = ExtractedPage(page_number=7, text="text", word_count=1, char_count=4)
     normalized = normalize_page(page)
     assert normalized.page_number == 7
 
 
 def test_normalize_page_blank_page_stays_empty():
-    page = ExtractDocumentPage(page_number=2, text="", word_count=0, char_count=0)
+    page = ExtractedPage(page_number=2, text="", word_count=0, char_count=0)
     normalized = normalize_page(page)
     assert normalized.text == ""
     assert normalized.word_count == 0
@@ -160,7 +160,7 @@ def test_normalize_page_blank_page_stays_empty():
 
 
 def test_normalize_page_control_char_only_page_becomes_empty():
-    page = ExtractDocumentPage(page_number=1, text="\x00\x1f  \n  ", word_count=1, char_count=6)
+    page = ExtractedPage(page_number=1, text="\x00\x1f  \n  ", word_count=1, char_count=6)
     normalized = normalize_page(page)
     assert normalized.text == ""
     assert normalized.word_count == 0
@@ -235,7 +235,7 @@ def test_normalize_document_default_strategy_is_conservative(make_extract_docume
     normalized = normalize_document(document)
 
     assert normalized.normalized_strategy == DEFAULT_NORMALIZATION_STRATEGY
-    assert normalized.normalized_strategy == "aggressive"
+    assert normalized.normalized_strategy == "structural"
 
 
 def test_normalize_document_custom_strategy_override(make_extract_document):
@@ -283,7 +283,7 @@ def test_preserves_page_local_processing_for_wrapped_lines(make_extract_document
 
 
 def test_builds_structural_table_representation() -> None:
-    page = ExtractDocumentPage(
+    page = ExtractedPage(
         page_number=1,
         text="Name  Role  Score\nAna  Engineer  98\nBob  Analyst  91",
         word_count=9,
@@ -300,3 +300,28 @@ def test_builds_structural_table_representation() -> None:
         ["Bob", "Analyst", "91"],
     ]
     assert normalized.text == "Name | Role | Score\nAna | Engineer | 98\nBob | Analyst | 91"
+
+def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocument):
+    """Verify that computed document and page metrics strictly match content lengths."""
+    
+    # Check Document level
+    assert normalized_doc.page_count == len(normalized_doc.pages)
+    assert normalized_doc.char_count == len(normalized_doc.full_text)
+    assert normalized_doc.word_count == len(normalized_doc.full_text.split())
+
+    # Check Page level
+    for page in normalized_doc.pages:
+        assert page.char_count == len(page.text)
+        assert page.word_count == len(page.text.split())
+
+
+def test_json_serialization_includes_computed_fields(normalized_doc: NormalizedDocument):
+    """Verify @computed_field fields appear when serialized to JSON/dict."""
+    doc_dict = normalized_doc.model_dump()
+
+    # Pydantic automatically serializes @computed_field properties into dicts/JSON
+    assert "page_count" in doc_dict
+    assert "word_count" in doc_dict
+    assert "char_count" in doc_dict
+    
+    assert doc_dict["page_count"] == len(normalized_doc.pages)
