@@ -139,6 +139,12 @@ def test_preserves_blank_line_between_heading_and_paragraph() -> None:
     assert normalize_text(text) == expected
 
 
+def test_does_not_promote_title_cased_clause_to_heading() -> None:
+    text = "Who This Is For\ncontinues on the next line."
+    expected = "Who This Is For continues on the next line."
+    assert normalize_text(text) == expected
+
+
 # --- normalize_page ---
 
 

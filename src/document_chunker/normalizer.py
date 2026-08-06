@@ -62,8 +62,53 @@ def _is_title_cased_short_line(text: str) -> bool:
     words = [word for word in re.findall(r"[A-Za-z][A-Za-z'/-]*", text) if word]
     if not words or len(words) > 12 or len(text) > 90:
         return False
+    if len(words) < 2:
+        return False
 
     lowercase_allowed = {"a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"}
+    clause_like_words = {
+        "am",
+        "are",
+        "be",
+        "been",
+        "being",
+        "can",
+        "could",
+        "did",
+        "do",
+        "does",
+        "had",
+        "has",
+        "have",
+        "how",
+        "is",
+        "it",
+        "its",
+        "should",
+        "that",
+        "their",
+        "there",
+        "these",
+        "they",
+        "this",
+        "those",
+        "was",
+        "were",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "will",
+        "would",
+        "you",
+        "your",
+    }
+    lowered_words = [word.lower() for word in words]
+    if any(word in clause_like_words for word in lowered_words):
+        return False
+
     title_like = 0
     for word in words:
         if word.lower() in lowercase_allowed:
