@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, field_validator, Field
 
@@ -44,11 +45,24 @@ class ExtractDocument(BaseModel):
     word_count: int  = Field(ge=0)
     char_count: int = Field(ge=0)
 
+class NormalizedTable(BaseModel):
+    header: list[str] = Field(default_factory=list)
+    rows: list[list[str]] = Field(default_factory=list)
+
+
+class NormalizedBlock(BaseModel):
+    block_type: Literal["heading", "paragraph", "list", "table"]
+    text: str | None = None
+    items: list[str] = Field(default_factory=list)
+    table: NormalizedTable | None = None
+
+
 class NormalizedPage(BaseModel):
     page_number: int  = Field(ge=1)
     text: str
     word_count: int  = Field(ge=0)
     char_count: int = Field(ge=0)
+    blocks: list[NormalizedBlock] = Field(default_factory=list)
 
 class NormalizedDocument(BaseModel):
     document_id: str

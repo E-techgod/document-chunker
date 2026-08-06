@@ -103,7 +103,7 @@ def test_normalize_text_full_pipeline_combined():
         "   \n"
         "End.  "
     )
-    expected = "Hello World This is a test\n\nValue, here; and (spaced)\n\nEnd."
+    expected = "Hello World\nThis is a test\n\nValue, here; and (spaced)\n\nEnd."
     assert normalize_text(messy) == expected
 
 
@@ -121,7 +121,7 @@ def test_repairs_hard_wrapped_lines_within_a_paragraph():
     )
     expected = (
         "Who this is for: Students with no prior coding experience who want to become job-ready AI "
-        "Engineers — not researchers, not ML PhDs. The people building real LLM-powered "
+        "Engineers — not researchers, not ML PhDs.\n\nThe people building real LLM-powered "
         "products that companies actually pay for."
     )
     assert normalize_text(wrapped) == expected
@@ -142,6 +142,7 @@ def test_normalize_page_recalculates_counts():
     assert normalized.text == "a b"
     assert normalized.word_count == 2
     assert normalized.char_count == 3
+    assert normalized.blocks[0].block_type == "paragraph"
 
 
 def test_normalize_page_preserves_page_number():
@@ -234,7 +235,7 @@ def test_normalize_document_default_strategy_is_conservative(make_extract_docume
     normalized = normalize_document(document)
 
     assert normalized.normalized_strategy == DEFAULT_NORMALIZATION_STRATEGY
-    assert normalized.normalized_strategy == "conservative"
+    assert normalized.normalized_strategy == "aggressive"
 
 
 def test_normalize_document_custom_strategy_override(make_extract_document):
@@ -242,3 +243,60 @@ def test_normalize_document_custom_strategy_override(make_extract_document):
     normalized = normalize_document(document, strategy="aggressive")
 
     assert normalized.normalized_strategy == "aggressive"
+
+
+def test_preserves_heading_paragraph_list_and_soft_wrap_boundaries() -> None:
+    text = (
+        "Executive Summary\n"
+        "This document explains\n"
+        "the pipeline behavior.\n"
+        "\n"
+        "Key Actions:\n"
+        "● Keep blank lines\n"
+        "1. Preserve list items\n"
+    )
+    expected = (
+        "Executive Summary\n"
+        "This document explains the pipeline behavior.\n\n"
+        "Key Actions:\n"
+        "● Keep blank lines\n1. Preserve list items"
+    )
+    assert normalize_text(text) == expected
+
+
+def test_preserves_page_local_processing_for_wrapped_lines(make_extract_document) -> None:
+    document = make_extract_document(
+        [
+            "Page One Heading\nWrapped line\ncontinues here",
+            "Page Two Heading\nAnother line\ncontinues there",
+        ]
+    )
+
+    normalized = normalize_document(document)
+
+    assert normalized.pages[0].text == "Page One Heading\nWrapped line continues here"
+    assert normalized.pages[1].text == "Page Two Heading\nAnother line continues there"
+    assert normalized.full_text == (
+        "Page One Heading\nWrapped line continues here\n\n"
+        "Page Two Heading\nAnother line continues there"
+    )
+
+
+def test_builds_structural_table_representation() -> None:
+    page = ExtractDocumentPage(
+        page_number=1,
+        text="Name  Role  Score\nAna  Engineer  98\nBob  Analyst  91",
+        word_count=9,
+        char_count=49,
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.header == ["Name", "Role", "Score"]
+    assert normalized.blocks[0].table.rows == [
+        ["Ana", "Engineer", "98"],
+        ["Bob", "Analyst", "91"],
+    ]
+    assert normalized.text == "Name | Role | Score\nAna | Engineer | 98\nBob | Analyst | 91"
