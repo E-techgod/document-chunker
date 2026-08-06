@@ -1,3 +1,4 @@
+from document_chunker.counting import count_words
 from document_chunker.normalizer import (
     DEFAULT_NORMALIZATION_STRATEGY,
     normalize_document,
@@ -488,12 +489,13 @@ def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocumen
     # Check Document level
     assert normalized_doc.page_count == len(normalized_doc.pages)
     assert normalized_doc.char_count == len(normalized_doc.full_text)
-    assert normalized_doc.word_count == len(normalized_doc.full_text.split())
+    assert normalized_doc.word_count == sum(page.word_count for page in normalized_doc.pages)
+    assert normalized_doc.word_count == count_words(normalized_doc.full_text)
 
     # Check Page level
     for page in normalized_doc.pages:
         assert page.char_count == len(page.text)
-        assert page.word_count == len(page.text.split())
+        assert page.word_count == count_words(page.text)
 
 
 def test_json_serialization_includes_computed_fields(normalized_doc: NormalizedDocument):

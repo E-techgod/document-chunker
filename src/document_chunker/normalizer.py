@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 
+from document_chunker.counting import count_words
 from document_chunker.schemas import (
     ExtractedPage,
     ExtractedDocument,
@@ -543,8 +544,6 @@ def normalize_page(page: ExtractedPage) -> NormalizedPage:
     return NormalizedPage(
         page_number=page.page_number,
         text=text,
-        word_count=len(text.split()),
-        char_count=len(text),
         blocks=blocks,
     )
 
@@ -564,10 +563,7 @@ def normalize_document(
         file_name=document.file_name,
         file_path=document.file_path,
         document_type=document.document_type,
-        page_count=len(pages),
         pages=pages,
         full_text=full_text,
-        word_count=len(full_text.split()),
-        char_count=len(full_text),
         normalized_strategy=strategy,
     )

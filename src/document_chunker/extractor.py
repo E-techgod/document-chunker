@@ -49,8 +49,6 @@ def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractedDocum
             ExtractedPage(
                 page_number=page_number,
                 text=text,
-                word_count=len(text.split()),
-                char_count=len(text),
             )
         )
 
@@ -64,9 +62,6 @@ def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractedDocum
         file_name=document.path.name,
         file_path=document.path,
         document_type=document.document_type,
-        page_count=len(pages),
         pages=pages,
         full_text=full_text,
-        word_count=sum(page.word_count for page in pages),
-        char_count=len(full_text),
     )

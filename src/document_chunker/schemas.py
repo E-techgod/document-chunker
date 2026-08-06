@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, field_validator, Field, field_validator, computed_field
+from document_chunker.counting import count_words
 
 NormalizationStrategy = Literal[
     "conservative",
@@ -38,7 +39,7 @@ class ExtractedPage(BaseModel):
     @computed_field
     @property
     def word_count(self) -> int:
-        return len(self.text.split())
+        return count_words(self.text)
 
     @computed_field
     @property
@@ -61,7 +62,7 @@ class ExtractedDocument(BaseModel):
     @computed_field
     @property
     def word_count(self) -> int:
-        return len(self.full_text.split())
+        return sum(page.word_count for page in self.pages)
 
     @computed_field
     @property
@@ -88,7 +89,7 @@ class NormalizedPage(BaseModel):
     @computed_field
     @property
     def word_count(self) -> int:
-        return len(self.text.split())
+        return count_words(self.text)
 
     @computed_field
     @property
@@ -112,11 +113,10 @@ class NormalizedDocument(BaseModel):
     @computed_field
     @property
     def word_count(self) -> int:
-        return len(self.full_text.split())
+        return sum(page.word_count for page in self.pages)
 
     @computed_field
     @property
     def char_count(self) -> int:
         return len(self.full_text)
-
 

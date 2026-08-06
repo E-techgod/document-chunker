@@ -88,8 +88,6 @@ def make_extract_document():
             ExtractedPage(
                 page_number=i,
                 text=text,
-                word_count=len(text.split()),
-                char_count=len(text),
             )
             for i, text in enumerate(texts, start=1)
         ]
@@ -99,11 +97,8 @@ def make_extract_document():
             file_name=file_name,
             file_path=file_path,
             document_type=document_type,
-            page_count=len(pages),
             pages=pages,
             full_text=full_text,
-            word_count=sum(p.word_count for p in pages),
-            char_count=len(full_text),
         )
 
     return _generator
