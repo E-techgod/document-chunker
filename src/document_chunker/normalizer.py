@@ -23,7 +23,6 @@ _LINE_WRAP_RE = re.compile(r"(?<!\n)\n(?!\n)")
 
 DEFAULT_NORMALIZATION_STRATEGY = "conservative"
 
-
 def repair_line_wraps(text: str) -> str:
     """Rejoin hard-wrapped lines within a paragraph, preserving blank-line paragraph breaks."""
     return _LINE_WRAP_RE.sub(" ", text)
@@ -32,23 +31,19 @@ def repair_line_wraps(text: str) -> str:
 def normalize_text(text: str) -> str:
     """Apply conservative, deterministic whitespace and control-character cleanup."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")  # 1. normalize line endings
+    text = _INVISIBLE_CHAR_RE.sub("", text)  # 10. remove invisible control characters
     text = _NON_BREAKING_SPACE_RE.sub(" ", text)  # 2. replace non-breaking spaces
 
     text = text.replace("\v", "\n").replace("\f", "\n")
     text = _CONTROL_CHAR_RE.sub("", text)  # 3. remove null/control characters
-    text = _INVISIBLE_CHAR_RE.sub("", text)  # 10. remove invisible control characters
-
     text = _HORIZONTAL_WHITESPACE_RE.sub(" ", text)  # 4. collapse repeated spaces/tabs
     text = _TRAILING_LINE_WHITESPACE_RE.sub("\n", text)  # 5. remove spaces around line breaks
     text = _LEADING_LINE_WHITESPACE_RE.sub("\n", text)
-
     text = _EXCESS_BLANK_LINES_RE.sub("\n\n", text)  # 6/8. limit and control blank lines
-
-    text = repair_line_wraps(text)  # 11. rejoin hard-wrapped lines within a paragraph
-    text = _HORIZONTAL_WHITESPACE_RE.sub(" ", text)  # collapse spaces introduced by the join
-
     text = _SPACE_BEFORE_PUNCTUATION_RE.sub(r"\1", text)  # 9. normalize spaces around punctuation
     text = _SPACE_AFTER_OPEN_BRACKET_RE.sub(r"\1", text)
+    text = repair_line_wraps(text)  # 11. rejoin hard-wrapped lines within a paragraph
+    text = _HORIZONTAL_WHITESPACE_RE.sub(" ", text)  # collapse spaces introduced by the join
 
     return text.strip()  # 7. trim leading/trailing whitespace
 

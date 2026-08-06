@@ -37,7 +37,7 @@ def main() -> None:
         sys.exit(1)
 
     print("Extraction complete: Raw text extracted from PDF pages.")
-    #print(f"Full text: {extracted.full_text}")
+    print(f"Full text: {extracted.full_text}")
     print(f"Extracted pages: {extracted.page_count}")
     print(f"Total words: {extracted.word_count}")
     print(f"Total chars: {extracted.char_count}\n")
@@ -45,7 +45,7 @@ def main() -> None:
     normalized = normalize_document(extracted)
 
     print("Normalization complete: Text cleaned and normalized.\n")
-    print(f"Full text normalized: \n{normalized.full_text}") 
+    #print(f"Full text normalized: \n{normalized.full_text}\n") 
     print(f"Extracted normalized pages: {normalized.page_count}")
     print(f"Total normalized words: {normalized.word_count}")
     print(f"Total normalized chars: {normalized.char_count}\n")

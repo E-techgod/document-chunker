@@ -20,7 +20,7 @@ def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractDocumen
 
     for page_number, page in enumerate(reader.pages, start=1):
         try:
-            text = page.extract_text() or ""
+            text = page.extract_text(extraction_mode="layout", layout_mode_space_vertically=False) or ""
         except Exception as exc:
             raise PDFExtractionError(
                 f"failed to extract text from page {page_number}: {document.path}"

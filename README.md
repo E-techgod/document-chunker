@@ -181,3 +181,5 @@
 - helper writes valid PDFs, encrypted PDFs, or raw byte files
 - fixture: `fake_reader()`
 - support classes: `FakePage`, `FakeReader`
+
+Change the extraction stratey to use layout instead reading raw stream objects 

@@ -3,12 +3,39 @@ from document_chunker.normalizer import (
     normalize_document,
     normalize_page,
     normalize_text,
+    repair_line_wraps
 )
 from document_chunker.schemas import ExtractDocumentPage
 
 
 # --- normalize_text: one test per rule ---
+def test_repairs_wrapped_sentence() -> None:
+    text = "Engineers —\nnot\nresearchers,\nnot\nML\nPhDs."
+    assert repair_line_wraps(text) == (
+        "Engineers — not researchers, not ML PhDs."
+    )
 
+
+def test_preserves_paragraph_break() -> None:
+    text = "First paragraph.\n\nSecond paragraph."
+    assert repair_line_wraps(text) == text
+
+
+def test_preserves_bullet_boundary() -> None:
+    text = "The philosophy:\n● Engineering first"
+    assert repair_line_wraps(text) == text
+
+
+def test_preserves_numbered_item() -> None:
+    text = "Steps:\n1. Load the PDF"
+    assert repair_line_wraps(text) == text
+
+
+def test_normalization_is_idempotent() -> None:
+    text = "Engineers —\nnot\nresearchers."
+    normalized = normalize_text(text)
+
+    assert normalize_text(normalized) == normalized
 
 def test_normalizes_line_endings():
     assert normalize_text("a\r\nb\rc") == "a b c"
