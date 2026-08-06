@@ -6,6 +6,7 @@ from src.document_chunker.extractor import PDFExtractionError, extract_pdf
 from src.document_chunker.loader import PDFLoadError, load_pdf
 from src.document_chunker.schemas import PDFDocumentInput
 from src.document_chunker.normalizer import normalize_document, normalize_text
+from src.document_chunker.counting import count_words
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
@@ -49,6 +50,11 @@ def main() -> None:
     print(f"Extracted normalized pages: {normalized.page_count}")
     print(f"Total normalized words: {normalized.word_count}")
     print(f"Total normalized chars: {normalized.char_count}\n")
+
+    assert normalized.page_count == len(normalized.pages)
+    assert normalized.char_count == len(normalized.full_text)
+    assert normalized.word_count == count_words(normalized.full_text)
+    assert normalize_document(normalized).full_text
 
 
     """ Saftery Checks for the extracted document to ensure consistency and correctness.
