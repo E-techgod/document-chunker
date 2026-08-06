@@ -35,6 +35,12 @@ class ClassifiedLine:
     line_type: str
 
 
+@dataclass(frozen=True)
+class BlockEntry:
+    block: NormalizedBlock
+    preceded_by_blank: bool
+
+
 def _normalize_inline_text(text: str) -> str:
     text = _HORIZONTAL_WHITESPACE_RE.sub(" ", text.strip())
     text = _SPACE_BEFORE_PUNCTUATION_RE.sub(r"\1", text)
@@ -161,6 +167,8 @@ def _build_paragraph(lines: list[ClassifiedLine], start_index: int) -> tuple[Nor
     while index + 1 < len(lines):
         current = lines[index]
         following = lines[index + 1]
+        if following.line_type == "blank":
+            break
         if not _should_join_with_next(current, following):
             break
 
@@ -180,13 +188,17 @@ def _render_table_block(table: NormalizedTable) -> str:
     return "\n".join(rows)
 
 
-def _render_blocks(blocks: list[NormalizedBlock]) -> str:
+def _render_blocks(block_entries: list[BlockEntry]) -> str:
     rendered = ""
     previous_type: str | None = None
-    for block in blocks:
+    for entry in block_entries:
+        block = entry.block
         separator = ""
         if rendered:
-            separator = "\n" if previous_type == "heading" else "\n\n"
+            if entry.preceded_by_blank:
+                separator = "\n\n"
+            else:
+                separator = "\n" if previous_type == "heading" else "\n\n"
 
         if block.block_type in {"heading", "paragraph"} and block.text:
             rendered += separator + block.text
@@ -198,18 +210,26 @@ def _render_blocks(blocks: list[NormalizedBlock]) -> str:
     return rendered.strip()
 
 
-def _build_blocks(text: str) -> list[NormalizedBlock]:
+def _build_block_entries(text: str) -> list[BlockEntry]:
     lines = [_classify_line(line) for line in _preprocess_text(text).split("\n")]
-    blocks: list[NormalizedBlock] = []
+    block_entries: list[BlockEntry] = []
     index = 0
+    preceded_by_blank = False
 
     while index < len(lines):
         current = lines[index]
         if current.line_type == "blank":
+            preceded_by_blank = True
             index += 1
             continue
         if current.line_type == "heading":
-            blocks.append(NormalizedBlock(block_type="heading", text=current.text))
+            block_entries.append(
+                BlockEntry(
+                    block=NormalizedBlock(block_type="heading", text=current.text),
+                    preceded_by_blank=preceded_by_blank,
+                )
+            )
+            preceded_by_blank = False
             index += 1
             continue
         if current.line_type == "list_item":
@@ -217,25 +237,40 @@ def _build_blocks(text: str) -> list[NormalizedBlock]:
             while index < len(lines) and lines[index].line_type == "list_item":
                 items.append(lines[index].text)
                 index += 1
-            blocks.append(NormalizedBlock(block_type="list", items=items))
+            block_entries.append(
+                BlockEntry(
+                    block=NormalizedBlock(block_type="list", items=items),
+                    preceded_by_blank=preceded_by_blank,
+                )
+            )
+            preceded_by_blank = False
             continue
         if current.line_type == "table_row":
             table_block, next_index = _build_table(lines, index)
             if table_block is not None:
-                blocks.append(table_block)
+                block_entries.append(
+                    BlockEntry(block=table_block, preceded_by_blank=preceded_by_blank)
+                )
+                preceded_by_blank = False
                 index = next_index
                 continue
         paragraph_block, next_index = _build_paragraph(lines, index)
-        blocks.append(paragraph_block)
+        block_entries.append(
+            BlockEntry(block=paragraph_block, preceded_by_blank=preceded_by_blank)
+        )
+        preceded_by_blank = False
         index = next_index
 
-    return blocks
+    return block_entries
+
+
+def _build_blocks(text: str) -> list[NormalizedBlock]:
+    return [entry.block for entry in _build_block_entries(text)]
 
 
 def repair_line_wraps(text: str) -> str:
     """Repair soft line wraps using page-local structural classification rules."""
-    blocks = _build_blocks(text)
-    return _render_blocks(blocks)
+    return _render_blocks(_build_block_entries(text))
 
 
 def normalize_text(text: str) -> str:
@@ -244,8 +279,9 @@ def normalize_text(text: str) -> str:
 
 
 def normalize_page(page: ExtractedPage) -> NormalizedPage:
-    blocks = _build_blocks(page.text)
-    text = _render_blocks(blocks)
+    block_entries = _build_block_entries(page.text)
+    blocks = [entry.block for entry in block_entries]
+    text = _render_blocks(block_entries)
     return NormalizedPage(
         page_number=page.page_number,
         text=text,

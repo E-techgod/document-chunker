@@ -133,6 +133,12 @@ def test_preserves_blank_line_paragraph_breaks_while_repairing_wraps():
     assert normalize_text(text) == expected
 
 
+def test_preserves_blank_line_between_heading_and_paragraph() -> None:
+    text = "Few-Shot Example\n\nParagraph line\ncontinues here."
+    expected = "Few-Shot Example\n\nParagraph line continues here."
+    assert normalize_text(text) == expected
+
+
 # --- normalize_page ---
 
 
