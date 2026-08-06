@@ -1,5 +1,4 @@
 import re
-from collections import Counter
 from dataclasses import dataclass
 
 from document_chunker.schemas import (
@@ -25,7 +24,8 @@ _SPACE_AFTER_OPEN_BRACKET_RE = re.compile(r"([(\[{])[ \t]+")
 _BULLET_RE = re.compile(r"^(?:[●•\-→]|\d+[.)])\s+")
 _NUMERIC_ROW_RE = re.compile(r"^[\d$€£¥(),.%+\-/: ]+$")
 _SENTENCE_TERMINAL_RE = re.compile(r'[.!?]["\')\]]?$')
-_SPLIT_TABLE_RE = re.compile(r"\s{2,}|\s+\|\s+")
+_PIPE_SPLIT_TABLE_RE = re.compile(r"\s*\|\s*")
+_WHITESPACE_SPLIT_TABLE_RE = re.compile(r"\s{2,}")
 
 DEFAULT_NORMALIZATION_STRATEGY: NormalizationStrategy = "structural"
 
@@ -143,7 +143,7 @@ def _is_heading_like(text: str) -> bool:
 def _is_table_candidate(text: str) -> bool:
     if not text or _BULLET_RE.match(text):
         return False
-    columns = [segment.strip() for segment in _SPLIT_TABLE_RE.split(text) if segment.strip()]
+    columns = _split_table_columns(text)
     if len(columns) < 2:
         return False
     compact_columns = sum(1 for column in columns if len(column.split()) <= 4 or _NUMERIC_ROW_RE.match(column))
@@ -168,7 +168,8 @@ def _classify_line(text: str) -> ClassifiedLine:
 def _should_join_with_next(current: ClassifiedLine, following: ClassifiedLine | None) -> bool:
     if following is None:
         return False
-    if current.line_type != "text" or following.line_type != "text":
+    paragraphish_types = {"text", "table_row"}
+    if current.line_type not in paragraphish_types or following.line_type not in paragraphish_types:
         return False
     if _SENTENCE_TERMINAL_RE.search(current.text):
         return False
@@ -177,32 +178,107 @@ def _should_join_with_next(current: ClassifiedLine, following: ClassifiedLine | 
     return following.text[:1].isalnum() or following.text[:1] in {"(", '"', "'"}
 
 
-def _split_table_columns(text: str) -> list[str]:
-    return [_normalize_inline_text(segment) for segment in _SPLIT_TABLE_RE.split(text) if segment.strip()]
+def _split_table_columns(
+    text: str,
+    expected_columns: int | None = None,
+    allow_token_fallback: bool = True,
+) -> list[str]:
+    if "|" in text:
+        columns = [segment for segment in _PIPE_SPLIT_TABLE_RE.split(text) if segment.strip()]
+    else:
+        columns = [segment for segment in _WHITESPACE_SPLIT_TABLE_RE.split(text) if segment.strip()]
+
+    normalized_columns = [_normalize_inline_text(segment) for segment in columns]
+    if expected_columns is None or len(normalized_columns) == expected_columns:
+        return normalized_columns
+
+    if not allow_token_fallback:
+        return normalized_columns
+
+    fallback_columns = [_normalize_inline_text(segment) for segment in text.split() if segment.strip()]
+    if len(fallback_columns) == expected_columns:
+        return fallback_columns
+
+    return normalized_columns
+
+
+def _row_contains_numeric_cell(row: list[str]) -> bool:
+    return any(any(char.isdigit() for char in cell) for cell in row)
+
+
+def _append_wrapped_table_text(row: list[str], continuation: str) -> None:
+    normalized_continuation = _normalize_inline_text(continuation)
+    for index in range(len(row) - 1, -1, -1):
+        if not _NUMERIC_ROW_RE.match(row[index]):
+            row[index] = f"{row[index]} {normalized_continuation}".strip()
+            return
+    row[-1] = f"{row[-1]} {normalized_continuation}".strip()
+
+
+def _looks_like_header_row(first_row: list[str], body_rows: list[list[str]]) -> bool:
+    if len(first_row) < 2 or not body_rows:
+        return False
+    if _row_contains_numeric_cell(first_row):
+        return False
+    if not all(len(cell.split()) <= 4 for cell in first_row):
+        return False
+
+    comparable_body_rows = [row for row in body_rows if abs(len(row) - len(first_row)) <= 1]
+    if not comparable_body_rows:
+        return False
+
+    return any(_row_contains_numeric_cell(row) for row in comparable_body_rows)
 
 
 def _build_table(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock | None, int]:
-    rows: list[list[str]] = []
-    index = start_index
-    while index < len(lines) and lines[index].line_type == "table_row":
-        row = _split_table_columns(lines[index].text)
-        if len(row) < 2:
+    candidate_end_index = start_index
+    while candidate_end_index < len(lines):
+        line_type = lines[candidate_end_index].line_type
+        if line_type in {"blank", "list_item"}:
             break
-        rows.append(row)
-        index += 1
+        candidate_end_index += 1
+
+    if candidate_end_index - start_index < 2:
+        return None, start_index
+
+    header = _split_table_columns(lines[start_index].text)
+    if len(header) < 2:
+        return None, start_index
+
+    rows = [header]
+    for row_index in range(start_index + 1, candidate_end_index):
+        row = _split_table_columns(
+            lines[row_index].text,
+            expected_columns=len(header),
+            allow_token_fallback=False,
+        )
+        if len(row) >= 2:
+            rows.append(row)
+            continue
+
+        if lines[row_index].line_type != "text":
+            row = _split_table_columns(lines[row_index].text, expected_columns=len(header))
+            if len(row) >= 2:
+                rows.append(row)
+                continue
+
+        if len(row) == 1 and len(rows) >= 2:
+            _append_wrapped_table_text(rows[-1], row[0])
+            continue
+        return None, start_index
 
     if len(rows) < 2:
         return None, start_index
 
-    column_count = Counter(len(row) for row in rows).most_common(1)[0][0]
-    normalized_rows = [row for row in rows if len(row) == column_count]
-    if len(normalized_rows) < 2:
-        return None, start_index
+    if _looks_like_header_row(rows[0], rows[1:]):
+        table_header = rows[0]
+        body = rows[1:]
+    else:
+        table_header = []
+        body = rows
 
-    header = normalized_rows[0]
-    body = normalized_rows[1:]
-    table = NormalizedTable(header=header, rows=body)
-    return NormalizedBlock(block_type="table", table=table), index
+    table = NormalizedTable(header=table_header, rows=body)
+    return NormalizedBlock(block_type="table", table=table), candidate_end_index
 
 
 def _build_paragraph(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock, int]:

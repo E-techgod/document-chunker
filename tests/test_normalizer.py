@@ -314,6 +314,26 @@ def test_builds_structural_table_representation() -> None:
     assert normalized.text == "Name | Role | Score\nAna | Engineer | 98\nBob | Analyst | 91"
 
 
+def test_builds_headerless_structural_table_representation() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text="Ana  Engineer  98\nBob  Analyst  91",
+        word_count=6,
+        char_count=35,
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.header == []
+    assert normalized.blocks[0].table.rows == [
+        ["Ana", "Engineer", "98"],
+        ["Bob", "Analyst", "91"],
+    ]
+    assert normalized.text == "Ana | Engineer | 98\nBob | Analyst | 91"
+
+
 def test_builds_table_when_rows_are_indented() -> None:
     page = ExtractedPage(
         page_number=1,
@@ -331,6 +351,82 @@ def test_builds_table_when_rows_are_indented() -> None:
         ["Ana", "Engineer", "98"],
         ["Bob", "Analyst", "91"],
     ]
+
+
+def test_builds_table_when_a_row_uses_single_space_column_gaps() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text="Name  Role  Score\nAna Engineer 98\nBob  Analyst  91",
+        word_count=9,
+        char_count=50,
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.header == ["Name", "Role", "Score"]
+    assert normalized.blocks[0].table.rows == [
+        ["Ana", "Engineer", "98"],
+        ["Bob", "Analyst", "91"],
+    ]
+
+
+def test_preserves_table_with_variable_column_counts() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text="Name  Role\nAna  Engineer  Remote\nBob  Analyst",
+        word_count=7,
+        char_count=42,
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.header == []
+    assert normalized.blocks[0].table.rows == [
+        ["Name", "Role"],
+        ["Ana", "Engineer", "Remote"],
+        ["Bob", "Analyst"],
+    ]
+
+
+def test_appends_wrapped_table_line_to_previous_row() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text=(
+            "Item  Description  Amount\n"
+            "Widget  Starter package  25\n"
+            "with setup assistance\n"
+            "Gadget  Renewal  30"
+        ),
+        word_count=12,
+        char_count=86,
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.header == ["Item", "Description", "Amount"]
+    assert normalized.blocks[0].table.rows == [
+        ["Widget", "Starter package with setup assistance", "25"],
+        ["Gadget", "Renewal", "30"],
+    ]
+
+
+def test_falls_back_to_text_when_table_rows_cannot_be_parsed_consistently() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text="Name  Role  Score\nAna Senior Engineer 98 % growth\nBob  Analyst  91",
+        word_count=10,
+        char_count=67,
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type != "table"
 
 def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocument):
     """Verify that computed document and page metrics strictly match content lengths."""
