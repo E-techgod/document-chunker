@@ -11,7 +11,7 @@ from document_chunker.schemas import ExtractDocumentPage
 
 
 def test_normalizes_line_endings():
-    assert normalize_text("a\r\nb\rc") == "a\nb\nc"
+    assert normalize_text("a\r\nb\rc") == "a b c"
 
 
 def test_replaces_non_breaking_spaces():
@@ -23,7 +23,7 @@ def test_removes_null_and_control_characters():
 
 
 def test_vertical_tab_and_form_feed_become_newlines():
-    assert normalize_text("a\vb\fc") == "a\nb\nc"
+    assert normalize_text("a\vb\fc") == "a b c"
 
 
 def test_collapses_repeated_spaces_and_tabs():
@@ -31,7 +31,7 @@ def test_collapses_repeated_spaces_and_tabs():
 
 
 def test_removes_spaces_around_line_breaks():
-    assert normalize_text("a   \n   b") == "a\nb"
+    assert normalize_text("a   \n   b") == "a b"
 
 
 def test_limits_excessive_blank_lines():
@@ -76,8 +76,34 @@ def test_normalize_text_full_pipeline_combined():
         "   \n"
         "End.  "
     )
-    expected = "Hello World\nThis is a test\n\nValue, here; and (spaced)\n\nEnd."
+    expected = "Hello World This is a test\n\nValue, here; and (spaced)\n\nEnd."
     assert normalize_text(messy) == expected
+
+
+def test_repairs_hard_wrapped_lines_within_a_paragraph():
+    wrapped = (
+        "Who this is for: Students with no prior coding experience who want to become job-ready AI\n"
+        "Engineers — \n"
+        "not\n"
+        "researchers,\n"
+        "not\n"
+        "ML\n"
+        "PhDs.\n"
+        "The people building real LLM-powered\n"
+        "products that companies actually pay for."
+    )
+    expected = (
+        "Who this is for: Students with no prior coding experience who want to become job-ready AI "
+        "Engineers — not researchers, not ML PhDs. The people building real LLM-powered "
+        "products that companies actually pay for."
+    )
+    assert normalize_text(wrapped) == expected
+
+
+def test_preserves_blank_line_paragraph_breaks_while_repairing_wraps():
+    text = "First paragraph wraps\nacross two lines.\n\nSecond paragraph also\nwraps here."
+    expected = "First paragraph wraps across two lines.\n\nSecond paragraph also wraps here."
+    assert normalize_text(text) == expected
 
 
 # --- normalize_page ---
@@ -129,7 +155,7 @@ def test_normalize_document_normalizes_each_page_independently(make_extract_docu
     document = make_extract_document(["a\r\nb", "c\x00d"])
     normalized = normalize_document(document)
 
-    assert normalized.pages[0].text == "a\nb"
+    assert normalized.pages[0].text == "a b"
     assert normalized.pages[1].text == "cd"
 
 

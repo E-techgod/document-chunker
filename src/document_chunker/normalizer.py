@@ -18,8 +18,15 @@ _LEADING_LINE_WHITESPACE_RE = re.compile(r"\n[ \t]+")
 _EXCESS_BLANK_LINES_RE = re.compile(r"\n{3,}")
 _SPACE_BEFORE_PUNCTUATION_RE = re.compile(r"[ \t]+([.,;:!?)\]}])")
 _SPACE_AFTER_OPEN_BRACKET_RE = re.compile(r"([(\[{])[ \t]+")
+# A single newline not adjacent to another newline is a soft line-wrap, not a paragraph break.
+_LINE_WRAP_RE = re.compile(r"(?<!\n)\n(?!\n)")
 
 DEFAULT_NORMALIZATION_STRATEGY = "conservative"
+
+
+def repair_line_wraps(text: str) -> str:
+    """Rejoin hard-wrapped lines within a paragraph, preserving blank-line paragraph breaks."""
+    return _LINE_WRAP_RE.sub(" ", text)
 
 
 def normalize_text(text: str) -> str:
@@ -36,6 +43,9 @@ def normalize_text(text: str) -> str:
     text = _LEADING_LINE_WHITESPACE_RE.sub("\n", text)
 
     text = _EXCESS_BLANK_LINES_RE.sub("\n\n", text)  # 6/8. limit and control blank lines
+
+    text = repair_line_wraps(text)  # 11. rejoin hard-wrapped lines within a paragraph
+    text = _HORIZONTAL_WHITESPACE_RE.sub(" ", text)  # collapse spaces introduced by the join
 
     text = _SPACE_BEFORE_PUNCTUATION_RE.sub(r"\1", text)  # 9. normalize spaces around punctuation
     text = _SPACE_AFTER_OPEN_BRACKET_RE.sub(r"\1", text)
