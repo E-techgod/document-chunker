@@ -19,7 +19,6 @@ _INVISIBLE_CHAR_RE = re.compile("[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad]")
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _HORIZONTAL_WHITESPACE_RE = re.compile(r"[ \t]+")
 _TRAILING_LINE_WHITESPACE_RE = re.compile(r"[ \t]+\n")
-_LEADING_LINE_WHITESPACE_RE = re.compile(r"\n[ \t]+")
 _EXCESS_BLANK_LINES_RE = re.compile(r"\n{3,}")
 _SPACE_BEFORE_PUNCTUATION_RE = re.compile(r"[ \t]+([.,;:!?)\]}])")
 _SPACE_AFTER_OPEN_BRACKET_RE = re.compile(r"([(\[{])[ \t]+")
@@ -50,7 +49,6 @@ def _preprocess_text(text: str) -> str:
     text = text.replace("\v", "\n").replace("\f", "\n")
     text = _CONTROL_CHAR_RE.sub("", text)
     text = _TRAILING_LINE_WHITESPACE_RE.sub("\n", text)
-    text = _LEADING_LINE_WHITESPACE_RE.sub("\n", text)
     return _EXCESS_BLANK_LINES_RE.sub("\n\n", text)
 
 

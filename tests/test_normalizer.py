@@ -301,6 +301,25 @@ def test_builds_structural_table_representation() -> None:
     ]
     assert normalized.text == "Name | Role | Score\nAna | Engineer | 98\nBob | Analyst | 91"
 
+
+def test_builds_table_when_rows_are_indented() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text="  Name  Role  Score\n    Ana  Engineer  98\n  Bob  Analyst  91",
+        word_count=9,
+        char_count=57,
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.header == ["Name", "Role", "Score"]
+    assert normalized.blocks[0].table.rows == [
+        ["Ana", "Engineer", "98"],
+        ["Bob", "Analyst", "91"],
+    ]
+
 def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocument):
     """Verify that computed document and page metrics strictly match content lengths."""
     
