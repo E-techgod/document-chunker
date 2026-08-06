@@ -1,10 +1,15 @@
 from pypdf import PdfReader
+from pydantic import BaseModel
 
 from document_chunker.schemas import ExtractDocument, ExtractDocumentPage, PDFDocumentInput
 
 
 class PDFExtractionError(Exception):
     """Raised when a PDF's text cannot be extracted."""
+
+class ExtractionConfig(BaseModel):
+    extraction_mode: str = "layout"
+    layout_mode_space_vertically: bool = False
 
 
 def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractDocument:
@@ -17,10 +22,11 @@ def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractDocumen
     from pypdf; no normalization is applied here.
     """
     pages: list[ExtractDocumentPage] = []
+    config = ExtractionConfig()
 
     for page_number, page in enumerate(reader.pages, start=1):
         try:
-            text = page.extract_text(extraction_mode="layout", layout_mode_space_vertically=False) or ""
+            text = page.extract_text(**config.model_dump()) or ""
         except Exception as exc:
             raise PDFExtractionError(
                 f"failed to extract text from page {page_number}: {document.path}"
