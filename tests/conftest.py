@@ -1,6 +1,8 @@
 import pytest
 from pypdf import PdfWriter
 
+from document_chunker.schemas import ExtractDocument, ExtractDocumentPage
+
 
 @pytest.fixture
 def create_pdf(tmp_path):
@@ -66,5 +68,41 @@ def fake_reader():
                 text, raise_error = item, False
             pages.append(FakePage(text, raise_error=raise_error))
         return FakeReader(pages)
+
+    return _generator
+
+
+@pytest.fixture
+def make_extract_document():
+    """Build an ExtractDocument from a list of raw page texts, no PDF I/O involved."""
+
+    def _generator(
+        texts,
+        document_id="doc1",
+        file_name="doc1.pdf",
+        file_path="/tmp/doc1.pdf",
+        document_type=None,
+    ):
+        pages = [
+            ExtractDocumentPage(
+                page_number=i,
+                text=text,
+                word_count=len(text.split()),
+                char_count=len(text),
+            )
+            for i, text in enumerate(texts, start=1)
+        ]
+        full_text = "\n\n".join(texts)
+        return ExtractDocument(
+            document_id=document_id,
+            file_name=file_name,
+            file_path=file_path,
+            document_type=document_type,
+            page_count=len(pages),
+            pages=pages,
+            full_text=full_text,
+            word_count=sum(p.word_count for p in pages),
+            char_count=len(full_text),
+        )
 
     return _generator
