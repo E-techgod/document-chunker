@@ -204,7 +204,7 @@ def test_joins_when_current_line_ends_with_conjunction() -> None:
 
 
 def test_normalize_page_recalculates_counts():
-    page = ExtractedPage(page_number=1, text="  a    b  ", word_count=99, char_count=99)
+    page = ExtractedPage(page_number=1, text="  a    b  ")
     normalized = normalize_page(page)
     assert normalized.text == "a b"
     assert normalized.word_count == 2
@@ -213,13 +213,13 @@ def test_normalize_page_recalculates_counts():
 
 
 def test_normalize_page_preserves_page_number():
-    page = ExtractedPage(page_number=7, text="text", word_count=1, char_count=4)
+    page = ExtractedPage(page_number=7, text="text")
     normalized = normalize_page(page)
     assert normalized.page_number == 7
 
 
 def test_normalize_page_blank_page_stays_empty():
-    page = ExtractedPage(page_number=2, text="", word_count=0, char_count=0)
+    page = ExtractedPage(page_number=2, text="")
     normalized = normalize_page(page)
     assert normalized.text == ""
     assert normalized.word_count == 0
@@ -227,7 +227,7 @@ def test_normalize_page_blank_page_stays_empty():
 
 
 def test_normalize_page_control_char_only_page_becomes_empty():
-    page = ExtractedPage(page_number=1, text="\x00\x1f  \n  ", word_count=1, char_count=6)
+    page = ExtractedPage(page_number=1, text="\x00\x1f  \n  ")
     normalized = normalize_page(page)
     assert normalized.text == ""
     assert normalized.word_count == 0
@@ -353,8 +353,6 @@ def test_builds_structural_table_representation() -> None:
     page = ExtractedPage(
         page_number=1,
         text="Name  Role  Score\nAna  Engineer  98\nBob  Analyst  91",
-        word_count=9,
-        char_count=49,
     )
 
     normalized = normalize_page(page)
@@ -373,8 +371,6 @@ def test_builds_headerless_structural_table_representation() -> None:
     page = ExtractedPage(
         page_number=1,
         text="Ana  Engineer  98\nBob  Analyst  91",
-        word_count=6,
-        char_count=35,
     )
 
     normalized = normalize_page(page)
@@ -393,8 +389,6 @@ def test_builds_table_when_rows_are_indented() -> None:
     page = ExtractedPage(
         page_number=1,
         text="  Name  Role  Score\n    Ana  Engineer  98\n  Bob  Analyst  91",
-        word_count=9,
-        char_count=57,
     )
 
     normalized = normalize_page(page)
@@ -412,8 +406,6 @@ def test_builds_table_when_a_row_uses_single_space_column_gaps() -> None:
     page = ExtractedPage(
         page_number=1,
         text="Name  Role  Score\nAna Engineer 98\nBob  Analyst  91",
-        word_count=9,
-        char_count=50,
     )
 
     normalized = normalize_page(page)
@@ -431,8 +423,6 @@ def test_preserves_table_with_variable_column_counts() -> None:
     page = ExtractedPage(
         page_number=1,
         text="Name  Role\nAna  Engineer  Remote\nBob  Analyst",
-        word_count=7,
-        char_count=42,
     )
 
     normalized = normalize_page(page)
@@ -456,8 +446,6 @@ def test_appends_wrapped_table_line_to_previous_row() -> None:
             "with setup assistance\n"
             "Gadget  Renewal  30"
         ),
-        word_count=12,
-        char_count=86,
     )
 
     normalized = normalize_page(page)
@@ -475,8 +463,6 @@ def test_falls_back_to_text_when_table_rows_cannot_be_parsed_consistently() -> N
     page = ExtractedPage(
         page_number=1,
         text="Name  Role  Score\nAna Senior Engineer 98 % growth\nBob  Analyst  91",
-        word_count=10,
-        char_count=67,
     )
 
     normalized = normalize_page(page)
