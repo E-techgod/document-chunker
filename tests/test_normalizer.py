@@ -181,6 +181,24 @@ def test_does_not_promote_title_cased_clause_to_heading() -> None:
     assert normalize_text(text) == expected
 
 
+def test_does_not_join_short_standalone_line_with_title_cased_following_line() -> None:
+    text = "Overview\nImplementation Notes"
+    expected = "Overview\n\nImplementation Notes"
+    assert normalize_text(text) == expected
+
+
+def test_joins_when_following_line_is_indented_continuation() -> None:
+    text = "This paragraph introduces the main idea\n    with supporting detail from the next wrapped line."
+    expected = "This paragraph introduces the main idea with supporting detail from the next wrapped line."
+    assert normalize_text(text) == expected
+
+
+def test_joins_when_current_line_ends_with_conjunction() -> None:
+    text = "The workflow handles extraction and\nvalidation before indexing."
+    expected = "The workflow handles extraction and validation before indexing."
+    assert normalize_text(text) == expected
+
+
 # --- normalize_page ---
 
 

@@ -24,6 +24,7 @@ _SPACE_AFTER_OPEN_BRACKET_RE = re.compile(r"([(\[{])[ \t]+")
 _LIST_ITEM_RE = re.compile(r"^(?:[●•\-→]|\d+[.)])\s+")
 _NUMERIC_ROW_RE = re.compile(r"^[\d$€£¥(),.%+\-/: ]+$")
 _SENTENCE_TERMINAL_RE = re.compile(r'[.!?]["\')\]]?$')
+_WRAP_CONTINUATION_END_RE = re.compile(r"(?:,|[&/\-–—]|(?:\b(?:and|or|but|nor|yet|so|for)\b))$", re.IGNORECASE)
 _PIPE_SPLIT_TABLE_RE = re.compile(r"\s*\|\s*")
 _WHITESPACE_SPLIT_TABLE_RE = re.compile(r"\s{2,}")
 
@@ -208,14 +209,82 @@ def _classify_line(text: str) -> ClassifiedLine:
 def _should_join_with_next(current: ClassifiedLine, following: ClassifiedLine | None) -> bool:
     if following is None:
         return False
-    paragraphish_types = {"text", "table_row"}
-    if current.line_type not in paragraphish_types or following.line_type not in paragraphish_types:
+    if current.line_type != "text" or following.line_type != "text":
         return False
+    if _has_strong_paragraph_stop(current, following):
+        return False
+    return _has_paragraph_join_signal(current, following)
+
+
+def _has_strong_paragraph_stop(current: ClassifiedLine, following: ClassifiedLine) -> bool:
     if _SENTENCE_TERMINAL_RE.search(current.text):
-        return False
+        return True
     if following.text[:1].isdigit():
+        return True
+    if _is_heading_like(following.text) or _is_title_cased_short_line(following.text):
+        return True
+    if _looks_like_section_label(following.text):
+        return True
+    return False
+
+
+def _has_paragraph_join_signal(current: ClassifiedLine, following: ClassifiedLine) -> bool:
+    if not _starts_like_paragraph_continuation(following):
         return False
-    return following.text[:1].isalnum() or following.text[:1] in {"(", '"', "'"}
+    if _WRAP_CONTINUATION_END_RE.search(current.text):
+        return True
+    if _looks_like_short_lowercase_fragment(current):
+        return True
+    if _following_starts_lowercase(following):
+        return True
+    if following.indent > current.indent:
+        return True
+    if _looks_visually_wrapped(current):
+        return True
+    if _looks_like_wrapped_fragment(current, following):
+        return True
+    return False
+
+
+def _starts_like_paragraph_continuation(line: ClassifiedLine) -> bool:
+    return bool(line.text[:1]) and (line.text[:1].isalnum() or line.text[:1] in {"(", '"', "'"})
+
+
+def _following_starts_lowercase(line: ClassifiedLine) -> bool:
+    return bool(line.text[:1]) and line.text[:1].islower()
+
+
+def _looks_visually_wrapped(line: ClassifiedLine) -> bool:
+    return len(line.text) >= 55 or len(line.text.split()) >= 9
+
+
+def _looks_like_short_lowercase_fragment(line: ClassifiedLine) -> bool:
+    words = line.text.split()
+    return 1 <= len(words) <= 2 and line.text[:1].islower()
+
+
+def _looks_like_wrapped_fragment(current: ClassifiedLine, following: ClassifiedLine) -> bool:
+    current_words = current.text.split()
+    following_words = following.text.split()
+    if len(current_words) > 2 or len(following_words) > 3:
+        return False
+    if _looks_like_section_label(current.text) or _looks_like_section_label(following.text):
+        return False
+    return any(char.islower() for char in following.text[1:]) or current.text.isupper()
+
+
+def _looks_like_section_label(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped or stripped.endswith(":"):
+        return False
+    if stripped[:1].isdigit():
+        return False
+    words = stripped.split()
+    if not 2 <= len(words) <= 6:
+        return False
+    if stripped[-1:] in {",", ";", "-", "–", "—", "&", "/"}:
+        return False
+    return all(word[:1].isupper() for word in words if word[:1].isalnum())
 
 
 def _split_table_columns(
