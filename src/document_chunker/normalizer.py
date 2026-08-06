@@ -33,6 +33,8 @@ DEFAULT_NORMALIZATION_STRATEGY: NormalizationStrategy = "structural"
 class ClassifiedLine:
     text: str
     line_type: str
+    indent: int
+    raw_text: str
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,19 @@ def _normalize_inline_text(text: str) -> str:
     text = _SPACE_BEFORE_PUNCTUATION_RE.sub(r"\1", text)
     text = _SPACE_AFTER_OPEN_BRACKET_RE.sub(r"\1", text)
     return text
+
+
+def _measure_indent(text: str) -> int:
+    indent = 0
+    for char in text:
+        if char == " ":
+            indent += 1
+            continue
+        if char == "\t":
+            indent += 4
+            continue
+        break
+    return indent
 
 
 def _preprocess_text(text: str) -> str:
@@ -151,18 +166,39 @@ def _is_table_candidate(text: str) -> bool:
 
 
 def _classify_line(text: str) -> ClassifiedLine:
+    indent = _measure_indent(text)
     stripped = text.strip()
     if not stripped:
-        return ClassifiedLine(text="", line_type="blank")
+        return ClassifiedLine(text="", line_type="blank", indent=indent, raw_text=text)
     if _BULLET_RE.match(stripped):
-        return ClassifiedLine(text=_normalize_inline_text(stripped), line_type="list_item")
+        return ClassifiedLine(
+            text=_normalize_inline_text(stripped),
+            line_type="list_item",
+            indent=indent,
+            raw_text=text,
+        )
     if _is_table_candidate(stripped):
-        return ClassifiedLine(text=stripped, line_type="table_row")
+        return ClassifiedLine(text=stripped, line_type="table_row", indent=indent, raw_text=text)
     if _is_heading_like(stripped):
-        return ClassifiedLine(text=_normalize_inline_text(stripped), line_type="heading")
+        return ClassifiedLine(
+            text=_normalize_inline_text(stripped),
+            line_type="heading",
+            indent=indent,
+            raw_text=text,
+        )
     if _is_title_cased_short_line(stripped):
-        return ClassifiedLine(text=_normalize_inline_text(stripped), line_type="heading")
-    return ClassifiedLine(text=_normalize_inline_text(stripped), line_type="text")
+        return ClassifiedLine(
+            text=_normalize_inline_text(stripped),
+            line_type="heading",
+            indent=indent,
+            raw_text=text,
+        )
+    return ClassifiedLine(
+        text=_normalize_inline_text(stripped),
+        line_type="text",
+        indent=indent,
+        raw_text=text,
+    )
 
 
 def _should_join_with_next(current: ClassifiedLine, following: ClassifiedLine | None) -> bool:
@@ -331,6 +367,30 @@ def _render_blocks(block_entries: list[BlockEntry]) -> str:
     return rendered.strip()
 
 
+def _build_list(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock, int]:
+    items: list[str] = []
+    index = start_index
+
+    while index < len(lines) and lines[index].line_type == "list_item":
+        item = lines[index]
+        item_parts = [item.text]
+        continuation_index = index + 1
+
+        while continuation_index < len(lines):
+            continuation = lines[continuation_index]
+            if continuation.line_type in {"blank", "list_item", "heading", "table_row"}:
+                break
+            if continuation.line_type != "text" or continuation.indent <= item.indent:
+                break
+            item_parts.append(continuation.text)
+            continuation_index += 1
+
+        items.append(" ".join(item_parts).strip())
+        index = continuation_index
+
+    return NormalizedBlock(block_type="list", items=items), index
+
+
 def _build_block_entries(text: str) -> list[BlockEntry]:
     lines = [_classify_line(line) for line in _preprocess_text(text).split("\n")]
     block_entries: list[BlockEntry] = []
@@ -354,17 +414,15 @@ def _build_block_entries(text: str) -> list[BlockEntry]:
             index += 1
             continue
         if current.line_type == "list_item":
-            items: list[str] = []
-            while index < len(lines) and lines[index].line_type == "list_item":
-                items.append(lines[index].text)
-                index += 1
+            list_block, next_index = _build_list(lines, index)
             block_entries.append(
                 BlockEntry(
-                    block=NormalizedBlock(block_type="list", items=items),
+                    block=list_block,
                     preceded_by_blank=preceded_by_blank,
                 )
             )
             preceded_by_blank = False
+            index = next_index
             continue
         if current.line_type == "table_row":
             table_block, next_index = _build_table(lines, index)

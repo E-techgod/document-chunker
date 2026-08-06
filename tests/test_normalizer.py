@@ -31,6 +31,33 @@ def test_preserves_numbered_item() -> None:
     assert repair_line_wraps(text) == text
 
 
+def test_attaches_indented_continuation_lines_to_list_items() -> None:
+    text = (
+        "Key Actions:\n"
+        "● Keep blank lines\n"
+        "  when preserving paragraph breaks.\n"
+        "1. Preserve list items\n"
+        "   across wrapped PDF lines.\n"
+    )
+    expected = (
+        "Key Actions:\n"
+        "● Keep blank lines when preserving paragraph breaks.\n"
+        "1. Preserve list items across wrapped PDF lines."
+    )
+    assert repair_line_wraps(text) == expected
+
+
+def test_stops_list_continuations_at_structural_boundaries() -> None:
+    text = (
+        "● First item\n"
+        "  continuation text\n"
+        "Next Section:\n"
+        "Paragraph line\n"
+    )
+    expected = "● First item continuation text\n\nNext Section:\nParagraph line"
+    assert repair_line_wraps(text) == expected
+
+
 def test_normalization_is_idempotent() -> None:
     text = "Engineers —\nnot\nresearchers."
     normalized = normalize_text(text)
