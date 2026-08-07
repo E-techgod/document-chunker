@@ -522,6 +522,69 @@ def test_keeps_rows_independent_when_most_cells_are_long_prose() -> None:
         ["6", "Agentic Systems, Production & Capstone", "A deployed AI product on GitHub"],
     ]
 
+def test_appends_wrapped_final_row_when_followed_by_unrelated_text() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text=(
+            "Month                        Focus                              Build by end of month\n"
+            "6         Agentic Systems, Production &                    A deployed AI product on GitHub\n"
+            "          Capstone\n"
+            "Questions? Reach out to your program coordinator."
+        ),
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.rows == [
+        ["6", "Agentic Systems, Production & Capstone", "A deployed AI product on GitHub"],
+    ]
+    assert normalized.blocks[1].block_type == "paragraph"
+    assert normalized.blocks[1].text == "Questions? Reach out to your program coordinator."
+
+
+def test_appends_multi_word_wrapped_row_misclassified_as_heading() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text=(
+            "Month                        Focus                              Build by end of month\n"
+            "7         Interviewing &                                  A polished portfolio site\n"
+            "          Career Prep"
+        ),
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.rows == [
+        ["7", "Interviewing & Career Prep", "A polished portfolio site"],
+    ]
+    assert len(normalized.blocks) == 1
+
+
+def test_does_not_merge_genuine_heading_after_complete_table_row() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text=(
+            "Month                        Focus                              Build by end of month\n"
+            "6         Agentic Systems, Production & Capstone         A deployed AI product on GitHub\n"
+            "Career Services"
+        ),
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.rows == [
+        ["6", "Agentic Systems, Production & Capstone", "A deployed AI product on GitHub"],
+    ]
+    assert normalized.blocks[1].block_type == "heading"
+    assert normalized.blocks[1].text == "Career Services"
+
+
 def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocument):
     """Verify that computed document and page metrics strictly match content lengths."""
     

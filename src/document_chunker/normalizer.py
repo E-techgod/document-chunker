@@ -375,22 +375,29 @@ def _looks_like_table_continuation(
     previous_row: list[str],
 ) -> bool:
     continuation = lines[continuation_index]
-    if continuation.line_type != "text":
+    # A wrapped fragment can get misclassified as a heading (e.g. a short,
+    # title-cased continuation like "Career Prep") by the line-level
+    # classifier, which has no notion that it's sitting inside a table. Blank
+    # and list-item lines never appear here anyway since candidate_end_index
+    # stops scanning before them; only rule out an actual table_row, whose
+    # multiple columns would already have satisfied len(row) >= 2 upstream.
+    if continuation.line_type in {"blank", "list_item", "table_row"}:
         return False
     if _SENTENCE_TERMINAL_RE.search(continuation.text):
         return False
 
     next_index = continuation_index + 1
-    while next_index < candidate_end_index:
+    if next_index < candidate_end_index:
         next_line = lines[next_index]
-        if next_line.line_type == "blank":
-            return False
-        next_row = _parse_table_row(next_line, expected_columns=expected_columns)
-        return len(next_row) >= 2
+        if next_line.line_type != "blank":
+            next_row = _parse_table_row(next_line, expected_columns=expected_columns)
+            if len(next_row) >= 2:
+                return True
 
-    # Last line in the candidate range: only treat it as a wrapped cell when
-    # the previous row visibly trails off (ends in a comma/ampersand/dash/
-    # conjunction) rather than assuming every trailing fragment belongs to it.
+    # Either the last line in the candidate range, or the line after it isn't
+    # tabular either: only treat this as a wrapped cell when the previous row
+    # visibly trails off (ends in a comma/ampersand/dash/conjunction) rather
+    # than assuming every trailing fragment belongs to it.
     return any(_WRAP_CONTINUATION_END_RE.search(cell) for cell in previous_row)
 
 
