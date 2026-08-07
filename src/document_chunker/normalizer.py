@@ -164,7 +164,7 @@ def _is_table_candidate(text: str) -> bool:
     if len(columns) < 2:
         return False
     compact_columns = sum(1 for column in columns if len(column.split()) <= 4 or _NUMERIC_ROW_RE.match(column))
-    return compact_columns >= 2
+    return compact_columns >= 1
 
 
 def _is_list_item(text: str) -> bool:
@@ -319,6 +319,10 @@ def _row_contains_numeric_cell(row: list[str]) -> bool:
 def _append_wrapped_table_text(row: list[str], continuation: str) -> None:
     normalized_continuation = _normalize_inline_text(continuation)
     for index in range(len(row) - 1, -1, -1):
+        if _WRAP_CONTINUATION_END_RE.search(row[index]):
+            row[index] = f"{row[index]} {normalized_continuation}".strip()
+            return
+    for index in range(len(row) - 1, -1, -1):
         if not _NUMERIC_ROW_RE.match(row[index]):
             row[index] = f"{row[index]} {normalized_continuation}".strip()
             return
@@ -330,7 +334,7 @@ def _looks_like_header_row(first_row: list[str], body_rows: list[list[str]]) -> 
         return False
     if _row_contains_numeric_cell(first_row):
         return False
-    if not all(len(cell.split()) <= 4 for cell in first_row):
+    if not all(len(cell.split()) <= 6 for cell in first_row):
         return False
 
     comparable_body_rows = [row for row in body_rows if abs(len(row) - len(first_row)) <= 1]
@@ -338,6 +342,56 @@ def _looks_like_header_row(first_row: list[str], body_rows: list[list[str]]) -> 
         return False
 
     return any(_row_contains_numeric_cell(row) for row in comparable_body_rows)
+
+
+def _parse_table_row(line: ClassifiedLine, expected_columns: int | None = None) -> list[str]:
+    row = _split_table_columns(
+        line.text,
+        expected_columns=expected_columns,
+        allow_token_fallback=False,
+    )
+    if len(row) >= 2:
+        return row
+
+    if line.line_type == "text":
+        return row
+
+    fallback_row = _split_table_columns(
+        line.text,
+        expected_columns=expected_columns,
+        allow_token_fallback=True,
+    )
+    if len(fallback_row) >= 2:
+        return fallback_row
+
+    return row
+
+
+def _looks_like_table_continuation(
+    lines: list[ClassifiedLine],
+    continuation_index: int,
+    candidate_end_index: int,
+    expected_columns: int,
+    previous_row: list[str],
+) -> bool:
+    continuation = lines[continuation_index]
+    if continuation.line_type != "text":
+        return False
+    if _SENTENCE_TERMINAL_RE.search(continuation.text):
+        return False
+
+    next_index = continuation_index + 1
+    while next_index < candidate_end_index:
+        next_line = lines[next_index]
+        if next_line.line_type == "blank":
+            return False
+        next_row = _parse_table_row(next_line, expected_columns=expected_columns)
+        return len(next_row) >= 2
+
+    # Last line in the candidate range: only treat it as a wrapped cell when
+    # the previous row visibly trails off (ends in a comma/ampersand/dash/
+    # conjunction) rather than assuming every trailing fragment belongs to it.
+    return any(_WRAP_CONTINUATION_END_RE.search(cell) for cell in previous_row)
 
 
 def _build_table(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock | None, int]:
@@ -348,34 +402,31 @@ def _build_table(lines: list[ClassifiedLine], start_index: int) -> tuple[Normali
             break
         candidate_end_index += 1
 
-    if candidate_end_index - start_index < 2:
-        return None, start_index
-
-    header = _split_table_columns(lines[start_index].text)
+    header = _parse_table_row(lines[start_index])
     if len(header) < 2:
         return None, start_index
 
     rows = [header]
-    for row_index in range(start_index + 1, candidate_end_index):
-        row = _split_table_columns(
-            lines[row_index].text,
-            expected_columns=len(header),
-            allow_token_fallback=False,
-        )
+    row_index = start_index + 1
+    while row_index < candidate_end_index:
+        line = lines[row_index]
+        row = _parse_table_row(line, expected_columns=len(header))
         if len(row) >= 2:
             rows.append(row)
+            row_index += 1
             continue
 
-        if lines[row_index].line_type != "text":
-            row = _split_table_columns(lines[row_index].text, expected_columns=len(header))
-            if len(row) >= 2:
-                rows.append(row)
-                continue
-
-        if len(row) == 1 and len(rows) >= 2:
+        if len(row) == 1 and len(rows) >= 2 and _looks_like_table_continuation(
+            lines,
+            continuation_index=row_index,
+            candidate_end_index=candidate_end_index,
+            expected_columns=len(header),
+            previous_row=rows[-1],
+        ):
             _append_wrapped_table_text(rows[-1], row[0])
+            row_index += 1
             continue
-        return None, start_index
+        break
 
     if len(rows) < 2:
         return None, start_index
@@ -388,7 +439,7 @@ def _build_table(lines: list[ClassifiedLine], start_index: int) -> tuple[Normali
         body = rows
 
     table = NormalizedTable(header=table_header, rows=body)
-    return NormalizedBlock(block_type="table", table=table), candidate_end_index
+    return NormalizedBlock(block_type="table", table=table), row_index
 
 
 def _build_paragraph(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock, int]:

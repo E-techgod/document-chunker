@@ -459,6 +459,29 @@ def test_appends_wrapped_table_line_to_previous_row() -> None:
     ]
 
 
+def test_stops_table_before_following_paragraph_line() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text=(
+            "Item  Description  Amount\n"
+            "Widget  Starter package  25\n"
+            "Gadget  Renewal  30\n"
+            "The renewal note belongs in a paragraph."
+        ),
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.rows == [
+        ["Widget", "Starter package", "25"],
+        ["Gadget", "Renewal", "30"],
+    ]
+    assert normalized.blocks[1].block_type == "paragraph"
+    assert normalized.blocks[1].text == "The renewal note belongs in a paragraph."
+
+
 def test_falls_back_to_text_when_table_rows_cannot_be_parsed_consistently() -> None:
     page = ExtractedPage(
         page_number=1,
@@ -468,6 +491,36 @@ def test_falls_back_to_text_when_table_rows_cannot_be_parsed_consistently() -> N
     normalized = normalize_page(page)
 
     assert normalized.blocks[0].block_type != "table"
+
+
+def test_keeps_rows_independent_when_most_cells_are_long_prose() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text=(
+            "Month                        Focus                              Build by end of month\n"
+            "1         Python, Git & Engineering Basics                 A CLI app pushed to GitHub\n"
+            "2         Data, Text & Embeddings Foundations              A semantic search prototype\n"
+            "3         Generative AI & Prompt Engineering               An LLM-powered data extractor\n"
+            "4         RAG, Vector Stores & Frameworks                  A \"Chat with your docs\" app\n"
+            "5         Machine Learning Foundations                     A re-ranker that boosts your RAG\n"
+            "6         Agentic Systems, Production &                    A deployed AI product on GitHub\n"
+            "          Capstone"
+        ),
+    )
+
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "table"
+    assert normalized.blocks[0].table is not None
+    assert normalized.blocks[0].table.header == ["Month", "Focus", "Build by end of month"]
+    assert normalized.blocks[0].table.rows == [
+        ["1", "Python, Git & Engineering Basics", "A CLI app pushed to GitHub"],
+        ["2", "Data, Text & Embeddings Foundations", "A semantic search prototype"],
+        ["3", "Generative AI & Prompt Engineering", "An LLM-powered data extractor"],
+        ["4", "RAG, Vector Stores & Frameworks", "A \"Chat with your docs\" app"],
+        ["5", "Machine Learning Foundations", "A re-ranker that boosts your RAG"],
+        ["6", "Agentic Systems, Production & Capstone", "A deployed AI product on GitHub"],
+    ]
 
 def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocument):
     """Verify that computed document and page metrics strictly match content lengths."""
