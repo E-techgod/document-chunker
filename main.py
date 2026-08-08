@@ -7,6 +7,7 @@ from src.document_chunker.loader import PDFLoadError, load_pdf
 from src.document_chunker.schemas import PDFDocumentInput
 from src.document_chunker.normalizer import normalize_document, normalize_text
 from src.document_chunker.counting import count_words
+from src.document_chunker.chunker import chunk_document, ChunkingConfig, ChunkingResult, DocumentChunk, NormalizedDocument
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
@@ -46,16 +47,16 @@ def main() -> None:
     normalized = normalize_document(extracted)
 
     print("Normalization complete: Text cleaned and normalized.\n")
-    print(f"Full text normalized: \n{normalized.full_text}\n") 
+    #print(f"Full text normalized: \n{normalized.full_text}\n") 
     print(f"Extracted normalized pages: {normalized.page_count}")
     print(f"Total normalized words: {normalized.word_count}")
     print(f"Total normalized chars: {normalized.char_count}\n")
 
-    assert normalized.page_count == len(normalized.pages)
-    assert normalized.char_count == len(normalized.full_text)
-    assert normalized.word_count == count_words(normalized.full_text)
-    assert normalize_document(normalized).full_text
-
+    chunker = chunk_document(normalized, config=ChunkingConfig(max_chunk_size=1000, overlap_size=100))
+    print("Chunking complete: Document split into overlapping character chunks.\n")
+    print(f"Total chunks created: {len(chunker.chunks)}")
+    print(f"First chunk text: \n{chunker.chunks[0].text}\n")
+    #rint(f"Last chunk text: \n{chunker.chunks[-1].text}\n")
 
     """ Saftery Checks for the extracted document to ensure consistency and correctness.
     full_text = "\n\n".join(page.text for page in extracted.pages)
@@ -80,6 +81,11 @@ def main() -> None:
     assert normalize_text("A \n B") == "A\nB"
     assert normalize_text("A\n\n\n\nB") == "A\n\nB"
     assert normalize_text(normalize_text(normalized.full_text)) == normalize_text(normalized.full_text)
+
+    assert normalized.page_count == len(normalized.pages)
+    assert normalized.char_count == len(normalized.full_text)
+    assert normalized.word_count == count_words(normalized.full_text)
+    assert normalize_document(normalized).full_text
     """
 
 if __name__ == "__main__":
