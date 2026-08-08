@@ -39,6 +39,19 @@ uv run main.py [path/to/file.pdf] [password]
 
 Defaults to `data/sample.pdf` with no password if no arguments are given. It walks through validate → load → extract → normalize and prints the word/char counts at each stage so you can see what each step actually changed.
 
+## Strategy Comparison
+
+Chunking runs against `normalized_text`, not the structured blocks — the point is to have a baseline that later strategies (structure-aware, semantic, etc.) can be measured against on the exact same normalized input. Metrics below are computed on `data/sample.pdf` with `ChunkingConfig(max_chunk_size=1000, overlap_size=100)`, the default `main.py` runs.
+
+- **Chunk size / Overlap / Stride** — the configured `max_chunk_size` / `overlap_size`, and the derived step between chunk starts (`stride = chunk_size - overlap`).
+- **Total chunk characters** — sum of every chunk's `char_count` (`ChunkingResult.total_char_count`). Overlapping regions get counted once per chunk that contains them, so this is normally >= source characters.
+- **Duplicate characters** — `total_chunk_characters − source_characters`: the excess from characters that appear in more than one chunk because of overlap.
+- **Duplicate overhead %** — `duplicate_characters / source_characters × 100`: how much extra text (and therefore extra embeddings/storage) the overlap costs relative to the source.
+
+| Strategy | Source chars | Chunks | Chunk size | Overlap | Stride | Total chunk chars | Duplicate chars | Duplicate overhead % |
+|---|---|---|---|---|---|---|---|---|
+| Character (fixed-size, overlap) | 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
+
 ## Tests
 
 Each pipeline stage has its own test file (`test_loader.py`, `test_extractor.py`, `test_normalizer.py`), covering both the happy path and the edge cases that motivated each design decision — encrypted/corrupted/empty PDFs, blank-page handling, idempotent normalization, table and list edge cases, etc. `conftest.py` holds the shared fixtures, including a real-PDF builder (`create_pdf`) and a fake `PdfReader` for testing extraction logic without touching disk.
