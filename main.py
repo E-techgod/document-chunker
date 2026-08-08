@@ -57,8 +57,15 @@ def main() -> None:
     chunker = chunk_document(normalized, config=chunking_config)
     print("Chunking complete: Document split into overlapping character chunks.\n")
     print(f"Total chunks created: {len(chunker.chunks)}")
-    print(f"First chunk text: \n{chunker.chunks[0].text}\n")
-    #rint(f"Last chunk text: \n{chunker.chunks[-1].text}\n")
+    print(f"Chunk 0 : range {chunker.chunks[0].start_char}-{chunker.chunks[0].end_char}: {chunker.chunks[0].char_count} chars, {chunker.chunks[0].word_count} words")
+    print(f"Chunk 1 : range {chunker.chunks[1].start_char}-{chunker.chunks[1].end_char}: {chunker.chunks[1].char_count} chars, {chunker.chunks[1].word_count} words")
+    print(f"Chunk 2 : range {chunker.chunks[2].start_char}-{chunker.chunks[2].end_char}: {chunker.chunks[2].char_count} chars, {chunker.chunks[2].word_count} words")
+    print(f"Chunk 3 : range {chunker.chunks[3].start_char}-{chunker.chunks[3].end_char}: {chunker.chunks[3].char_count} chars, {chunker.chunks[3].word_count} words")
+    print(f"Chunk 4 : range {chunker.chunks[4].start_char}-{chunker.chunks[4].end_char}: {chunker.chunks[4].char_count} chars, {chunker.chunks[4].word_count} words")
+    print(f"Chunk 5 : range {chunker.chunks[5].start_char}-{chunker.chunks[5].end_char}: {chunker.chunks[5].char_count} chars, {chunker.chunks[5].word_count} words")
+    print(f"Chunk 6 : range {chunker.chunks[6].start_char}-{chunker.chunks[6].end_char}: {chunker.chunks[6].char_count} chars, {chunker.chunks[6].word_count} words")
+    print(f"Chunk 7 : range {chunker.chunks[7].start_char}-{chunker.chunks[7].end_char}: {chunker.chunks[7].char_count} chars, {chunker.chunks[7].word_count} words")
+    print(f"Chunk 8 : range {chunker.chunks[8].start_char}-{chunker.chunks[8].end_char}: {chunker.chunks[8].char_count} chars, {chunker.chunks[8].word_count} words\n")
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:
