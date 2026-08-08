@@ -2,7 +2,7 @@ import pytest
 from pypdf import PdfWriter
 
 from document_chunker.normalizer import normalize_document
-from document_chunker.schemas import ExtractedDocument, ExtractedPage
+from document_chunker.schemas import ExtractedDocument, ExtractedPage, NormalizedDocument, NormalizedPage
 
 
 @pytest.fixture
@@ -93,6 +93,38 @@ def make_extract_document():
         ]
         full_text = "\n\n".join(texts)
         return ExtractedDocument(
+            document_id=document_id,
+            file_name=file_name,
+            file_path=file_path,
+            document_type=document_type,
+            pages=pages,
+            full_text=full_text,
+        )
+
+    return _generator
+
+
+@pytest.fixture
+def make_normalized_document():
+    """Build a NormalizedDocument directly from raw page texts, bypassing the normalization
+    pipeline so tests can control full_text and page boundaries precisely (e.g. leftover
+    whitespace normalize_document would otherwise have stripped)."""
+
+    def _generator(
+        texts,
+        document_id="doc1",
+        file_name="doc1.pdf",
+        file_path="/tmp/doc1.pdf",
+        document_type=None,
+        full_text=None,
+    ):
+        pages = [
+            NormalizedPage(page_number=i, text=text)
+            for i, text in enumerate(texts, start=1)
+        ]
+        if full_text is None:
+            full_text = "\n\n".join(texts)
+        return NormalizedDocument(
             document_id=document_id,
             file_name=file_name,
             file_path=file_path,

@@ -120,3 +120,48 @@ class NormalizedDocument(BaseModel):
     def char_count(self) -> int:
         return len(self.full_text)
 
+class ChunkingConfig(BaseModel): # The rules: How to chunk the document into smaller pieces for processing
+    max_chunk_size: int = Field(default=1000, ge=1)
+    overlap_size: int = Field(default=200, ge=0)
+    chunking_strategy: str = "characters"
+
+class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represents a chunk of a document, with metadata and content
+    document_id: str
+    chunk_id: str
+    chunk_index: int = Field(ge=0)
+    start_char: int = Field(ge=0)
+    end_char: int = Field(ge=0)
+    text: str
+    page_numbers: list[int] = Field(default_factory=list)
+    word_count: int = Field(default=0, ge=0)
+    char_count: int = Field(default=0, ge=0)
+
+    @field_validator("word_count", "char_count", mode="before")
+    @classmethod
+    def validate_counts(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("word_count and char_count must be non-negative")
+        return value
+
+class ChunkingResult(BaseModel): # The whole chunking output: Represents the whole document after chunking: Represents the result of chunking a document, with metadata and chunks
+    document_id: str
+    file_name: str
+    file_path: Path
+    document_type: str | None = None
+    chunks: list[DocumentChunk] = Field(default_factory=list)
+    chunking_strategy: str | None = None
+
+    @computed_field
+    @property
+    def chunk_count(self) -> int:
+        return len(self.chunks)
+
+    @computed_field
+    @property
+    def total_word_count(self) -> int:
+        return sum(chunk.word_count for chunk in self.chunks)
+
+    @computed_field
+    @property
+    def total_char_count(self) -> int: 
+        return sum(chunk.char_count for chunk in self.chunks)
