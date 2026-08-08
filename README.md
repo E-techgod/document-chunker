@@ -4,7 +4,96 @@ A PDF-in, clean-text-out pipeline I'm building step by step: validate the file, 
 
 The end goal (hence the name) is chunking: turning a normalized document into retrieval-sized pieces. That stage doesn't exist yet — right now the pipeline stops after normalization, and `main.py` is a scratch runner for exercising the pipeline end to end, not a finished CLI.
 
-## The pipeline
+## Architecture
+
+The graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, and `graphify-out/graph.html` shows the project organized around shared schemas, a linear processing pipeline, and a separate validation layer around chunking. The diagram below compresses that generated graph into the core runtime relationships.
+
+```mermaid
+flowchart LR
+  main["main.py"]
+
+  subgraph core["src/document_chunker"]
+    schemas["schemas.py
+    Pydantic models + computed metrics"]
+    counting["counting.py
+    count_words()"]
+    loader["loader.py
+    load_pdf()"]
+    extractor["extractor.py
+    extract_pdf()"]
+    normalizer["normalizer.py
+    normalize_document()
+    normalize_page()
+    repair_line_wraps()"]
+    chunker["chunker.py
+    chunk_document()"]
+    evaluator["evaluator.py
+    validate_chunks()"]
+  end
+
+  tests["tests/
+  stage-focused test suites"]
+  graphify["graphify-out/
+  GRAPH_REPORT.md, graph.json, graph.html"]
+
+  main --> schemas
+  main --> loader
+  main --> extractor
+  main --> normalizer
+  main --> chunker
+  main --> evaluator
+  main --> counting
+
+  loader --> schemas
+  extractor --> schemas
+  normalizer --> schemas
+  chunker --> schemas
+  evaluator --> schemas
+
+  normalizer --> counting
+  chunker --> counting
+  schemas --> counting
+
+  tests --> loader
+  tests --> extractor
+  tests --> normalizer
+  tests --> chunker
+  tests --> evaluator
+  tests --> schemas
+
+  graphify -.maps dependencies of.-> core
+  graphify -.summarizes test and module links.-> tests
+```
+
+## Pipeline
+
+This is the runtime document-processing path reflected in `main.py` and reinforced by the graph communities around `PDFDocumentInput`, `normalize_document`, `ChunkingConfig`, and `validate_chunks`.
+
+```mermaid
+flowchart TD
+  input["PDF path + optional password"]
+  validate["PDFDocumentInput
+  validate path, extension, file size"]
+  load["load_pdf()
+  open, decrypt, verify pages"]
+  extract["extract_pdf()
+  build ExtractedDocument + ExtractedPage[]"]
+  normalize["normalize_document()
+  rebuild paragraphs, lists, and tables"]
+  chunk["chunk_document()
+  fixed-size overlapping character chunks"]
+  verify["validate_chunks()
+  order, size, overlap, coverage, traceability, offsets"]
+  output["ChunkingResult + ChunkValidationReport"]
+
+  input --> validate
+  validate --> load
+  load --> extract
+  extract --> normalize
+  normalize --> chunk
+  chunk --> verify
+  verify --> output
+```
 
 **Validate** — `PDFDocumentInput` (in `schemas.py`) is the gate everything else trusts. Before any PDF gets opened, pydantic checks the path is non-empty, exists, is an actual file, ends in `.pdf`, and isn't zero bytes.
 
