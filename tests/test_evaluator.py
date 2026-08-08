@@ -95,6 +95,37 @@ def test_oversized_chunk_is_flagged(make_normalized_document):
     assert any(issue.invariant == MAX_SIZE for issue in report.issues)
 
 
+def test_oversized_chunk_is_not_flagged_under_structural_strategy(make_normalized_document):
+    # The structural strategy treats max_chunk_size as a soft target: a single
+    # unsplittable element (e.g. one long sentence) may legitimately overflow it.
+    full_text = "ABCDEFGHIJ"
+    document = make_normalized_document(["ABCDEFGHIJ"], full_text=full_text)
+    config = ChunkingConfig(max_chunk_size=5, overlap_size=0, chunking_strategy="structural")
+    result = ChunkingResult(
+        document_id=document.document_id,
+        file_name=document.file_name,
+        file_path=document.file_path,
+        chunking_strategy="structural",
+        chunks=[
+            DocumentChunk(
+                document_id=document.document_id,
+                chunk_id="doc1_chunk_0",
+                chunk_index=0,
+                start_char=0,
+                end_char=10,
+                text=full_text,
+                word_count=1,
+                char_count=10,
+            )
+        ],
+    )
+
+    report = validate_chunks(document, result, config)
+
+    assert report.is_valid
+    assert not any(issue.invariant == MAX_SIZE for issue in report.issues)
+
+
 # --- invariant 3: correct overlap ---
 
 

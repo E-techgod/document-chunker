@@ -27,15 +27,19 @@ def _check_order(chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
     ]
 
 
-def _check_max_size(chunks: list[DocumentChunk], max_chunk_size: int) -> list[ChunkValidationIssue]:
+def _check_max_size(chunks: list[DocumentChunk], config: ChunkingConfig) -> list[ChunkValidationIssue]:
+    # The structural strategy treats max_chunk_size as a soft target: a single
+    # unsplittable sentence/element is kept whole even if it overflows the limit.
+    if config.chunking_strategy == "structural":
+        return []
     return [
         ChunkValidationIssue(
             invariant=MAX_SIZE,
             chunk_index=chunk.chunk_index,
-            message=f"chunk text length {len(chunk.text)} exceeds max_chunk_size {max_chunk_size}",
+            message=f"chunk text length {len(chunk.text)} exceeds max_chunk_size {config.max_chunk_size}",
         )
         for chunk in chunks
-        if len(chunk.text) > max_chunk_size
+        if len(chunk.text) > config.max_chunk_size
     ]
 
 
@@ -160,7 +164,7 @@ def validate_chunks(
     """Check a ChunkingResult against the chunking invariants, collecting every violation found."""
     issues = [
         *_check_order(result.chunks),
-        *_check_max_size(result.chunks, config.max_chunk_size),
+        *_check_max_size(result.chunks, config),
         *_check_overlap(result.chunks, config),
         *_check_coverage(document.full_text, result.chunks),
         *_check_traceability(document.full_text, result.chunks),

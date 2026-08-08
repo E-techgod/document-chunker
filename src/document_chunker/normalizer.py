@@ -477,9 +477,10 @@ def _render_table_block(table: NormalizedTable) -> str:
     return "\n".join(rows)
 
 
-def _render_blocks(block_entries: list[BlockEntry]) -> str:
+def _render_blocks(block_entries: list[BlockEntry]) -> tuple[str, list[NormalizedBlock]]:
     rendered = ""
     previous_type: str | None = None
+    positioned_blocks: list[NormalizedBlock] = []
     for entry in block_entries:
         block = entry.block
         separator = ""
@@ -489,14 +490,37 @@ def _render_blocks(block_entries: list[BlockEntry]) -> str:
             else:
                 separator = "\n" if previous_type == "heading" else "\n\n"
 
+        segment = ""
         if block.block_type in {"heading", "paragraph"} and block.text:
-            rendered += separator + block.text
+            segment = block.text
         elif block.block_type == "list" and block.items:
-            rendered += separator + "\n".join(block.items)
+            segment = "\n".join(block.items)
         elif block.block_type == "table" and block.table:
-            rendered += separator + _render_table_block(block.table)
+            segment = _render_table_block(block.table)
+
+        if segment:
+            rendered += separator
+            start = len(rendered)
+            rendered += segment
+            end = len(rendered)
+        else:
+            start = end = len(rendered)
+
+        positioned_blocks.append(block.model_copy(update={"start_char": start, "end_char": end}))
         previous_type = block.block_type
-    return rendered.strip()
+
+    stripped = rendered.strip()
+    leading_trim = len(rendered) - len(rendered.lstrip())
+    final_blocks = [
+        block.model_copy(
+            update={
+                "start_char": min(max(block.start_char - leading_trim, 0), len(stripped)),
+                "end_char": min(max(block.end_char - leading_trim, 0), len(stripped)),
+            }
+        )
+        for block in positioned_blocks
+    ]
+    return stripped, final_blocks
 
 
 def _build_list(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock, int]:
@@ -587,7 +611,8 @@ def _build_blocks(text: str) -> list[NormalizedBlock]:
 
 def repair_line_wraps(text: str) -> str:
     """Repair soft line wraps using page-local structural classification rules."""
-    return _render_blocks(_build_block_entries(text))
+    text, _ = _render_blocks(_build_block_entries(text))
+    return text
 
 
 def normalize_text(text: str) -> str:
@@ -597,8 +622,7 @@ def normalize_text(text: str) -> str:
 
 def normalize_page(page: ExtractedPage) -> NormalizedPage:
     block_entries = _build_block_entries(page.text)
-    blocks = [entry.block for entry in block_entries]
-    text = _render_blocks(block_entries)
+    text, blocks = _render_blocks(block_entries)
     return NormalizedPage(
         page_number=page.page_number,
         text=text,

@@ -212,6 +212,24 @@ def test_normalize_page_recalculates_counts():
     assert normalized.blocks[0].block_type == "paragraph"
 
 
+def test_normalize_page_block_offsets_locate_block_text_within_page_text():
+    page = ExtractedPage(page_number=1, text="TITLE:\n\nSome paragraph text here.")
+    normalized = normalize_page(page)
+
+    assert [b.block_type for b in normalized.blocks] == ["heading", "paragraph"]
+    for block in normalized.blocks:
+        assert normalized.text[block.start_char : block.end_char] == block.text
+
+
+def test_normalize_page_block_offsets_span_list_items_in_order():
+    page = ExtractedPage(page_number=1, text="- first item\n- second item")
+    normalized = normalize_page(page)
+
+    list_block = normalized.blocks[0]
+    assert list_block.block_type == "list"
+    assert normalized.text[list_block.start_char : list_block.end_char] == "\n".join(list_block.items)
+
+
 def test_normalize_page_preserves_page_number():
     page = ExtractedPage(page_number=7, text="text")
     normalized = normalize_page(page)

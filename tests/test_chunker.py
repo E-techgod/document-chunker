@@ -1,6 +1,7 @@
 import pytest
 
 from document_chunker.chunker import chunk_document
+from document_chunker.normalizer import normalize_document
 from document_chunker.schemas import ChunkingConfig
 
 
@@ -150,3 +151,89 @@ def test_whitespace_only_chunks_are_skipped(make_normalized_document):
     # but original offsets into full_text are preserved, not renumbered.
     assert result.chunks[1].start_char == 15
     assert result.chunks[1].end_char == 20
+
+
+# --- structural strategy (v2.1) ---
+
+
+def _normalized(make_extract_document, texts):
+    return normalize_document(make_extract_document(texts))
+
+
+def test_structural_strategy_packs_headings_paragraphs_lists_and_tables_atomically(make_extract_document):
+    text = (
+        "IMPORTANT NOTICE:\n\n"
+        "This is a simple paragraph explaining something in detail for testing purposes.\n\n"
+        "- First item in the list\n"
+        "- Second item in the list\n"
+        "- Third item in the list\n\n"
+        "Name | Role | Score\n"
+        "Alice | Engineer | 90\n"
+        "Bob | Manager | 85\n"
+    )
+    document = _normalized(make_extract_document, [text])
+
+    result = chunk_document(document, ChunkingConfig(max_chunk_size=60, overlap_size=0, chunking_strategy="structural"))
+
+    assert result.chunking_strategy == "structural"
+    assert [c.text for c in result.chunks] == [
+        "IMPORTANT NOTICE:",
+        "This is a simple paragraph explaining something in detail for testing purposes.",
+        "- First item in the list\n- Second item in the list",
+        "- Third item in the list\n\nName | Role | Score",
+        "Alice | Engineer | 90\nBob | Manager | 85",
+    ]
+
+
+def test_structural_strategy_closes_chunk_before_element_that_would_overflow(make_extract_document):
+    document = _normalized(
+        make_extract_document,
+        ["- First item in the list\n- Second item in the list\n- Third item in the list"],
+    )
+
+    result = chunk_document(document, ChunkingConfig(max_chunk_size=50, overlap_size=0, chunking_strategy="structural"))
+
+    assert result.chunks[0].text == "- First item in the list\n- Second item in the list"
+    assert result.chunks[1].text == "- Third item in the list"
+    assert all(len(c.text) <= 50 for c in result.chunks)
+
+
+def test_structural_strategy_splits_oversized_paragraph_at_sentence_boundaries(make_extract_document):
+    sentences = [f"This is sentence number {i} in a very long paragraph. " for i in range(1, 6)]
+    text = "".join(sentences).strip()
+    document = _normalized(make_extract_document, [text])
+
+    result = chunk_document(document, ChunkingConfig(max_chunk_size=60, overlap_size=0, chunking_strategy="structural"))
+
+    assert len(result.chunks) > 1
+    for chunk in result.chunks:
+        # Every chunk boundary lands on a sentence boundary, never mid-sentence.
+        assert chunk.text.rstrip().endswith(".")
+
+
+def test_structural_strategy_allows_chunks_to_span_page_boundaries(make_extract_document):
+    document = _normalized(
+        make_extract_document,
+        ["This is page one paragraph.", "This is page two paragraph."],
+    )
+
+    result = chunk_document(document, ChunkingConfig(max_chunk_size=200, overlap_size=0, chunking_strategy="structural"))
+
+    assert len(result.chunks) == 1
+    assert result.chunks[0].page_numbers == [1, 2]
+
+
+def test_structural_strategy_produces_no_overlap_between_chunks(make_extract_document):
+    text = (
+        "- First item in the list\n"
+        "- Second item in the list\n"
+        "- Third item in the list\n\n"
+        "Name | Role | Score\n"
+        "Alice | Engineer | 90\n"
+    )
+    document = _normalized(make_extract_document, [text])
+
+    result = chunk_document(document, ChunkingConfig(max_chunk_size=50, overlap_size=0, chunking_strategy="structural"))
+
+    for earlier, later in zip(result.chunks, result.chunks[1:]):
+        assert later.start_char >= earlier.end_char

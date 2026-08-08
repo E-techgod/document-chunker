@@ -67,10 +67,10 @@ def main() -> None:
     print(f"Chunk 7 : range {chunker.chunks[7].start_char}-{chunker.chunks[7].end_char}: {chunker.chunks[7].char_count} chars, {chunker.chunks[7].word_count} words")
     print(f"Chunk 8 : range {chunker.chunks[8].start_char}-{chunker.chunks[8].end_char}: {chunker.chunks[8].char_count} chars, {chunker.chunks[8].word_count} words\n")
 """
-    print(f"Chunk 0: {chunker.chunks[0].text}")
-    print(f"Chunk 1: {chunker.chunks[1].text}")
-    print(f"Chunk 2: {chunker.chunks[2].text}")
-    print(f"Chunk 3: {chunker.chunks[3].text}")
+    print(f" ----------------------------------------------------------------------- Chunk 0 ----------------------------------------------------------------------- \n{chunker.chunks[0].text}\n")
+    print(f" ----------------------------------------------------------------------- Chunk 1 ----------------------------------------------------------------------- \n{chunker.chunks[1].text}\n")
+    print(f" ----------------------------------------------------------------------- Chunk 2 ----------------------------------------------------------------------- \n{chunker.chunks[2].text}\n")
+    print(f" ----------------------------------------------------------------------- Chunk 3 ----------------------------------------------------------------------- \n{chunker.chunks[3].text}\n")
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:

@@ -79,6 +79,8 @@ class NormalizedBlock(BaseModel):
     text: str | None = None
     items: list[str] = Field(default_factory=list)
     table: NormalizedTable | None = None
+    start_char: int = Field(default=0, ge=0)
+    end_char: int = Field(default=0, ge=0)
 
 
 class NormalizedPage(BaseModel):
@@ -179,3 +181,4 @@ class ChunkValidationReport(BaseModel): # The full set of invariant violations f
     @property
     def is_valid(self) -> bool:
         return not self.issues
+

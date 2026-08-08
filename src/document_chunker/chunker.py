@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator
 
 from document_chunker.counting import count_words
@@ -6,9 +7,13 @@ from document_chunker.schemas import (
     ChunkingResult,
     DocumentChunk,
     NormalizedDocument,
+    NormalizedPage,
 )
 
 DEFAULT_CHUNKING_STRATEGY = "characters"
+STRUCTURAL_STRATEGY = "structural"
+
+_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 def _compute_page_spans(document: NormalizedDocument) -> list[tuple[int, int, int]]:
@@ -52,15 +57,90 @@ def _iter_char_spans(text: str, max_chunk_size: int, overlap_size: int) -> Itera
         start += step
 
 
+def _iter_page_structural_elements(page: NormalizedPage) -> Iterator[tuple[int, int]]:
+    """Yield page-local (start, end) spans, one per atomic structural unit on the page."""
+    for block in page.blocks:
+        if block.block_type in {"heading", "paragraph"}:
+            if block.end_char > block.start_char:
+                yield block.start_char, block.end_char
+        elif block.block_type == "list":
+            cursor = block.start_char
+            for item in block.items:
+                yield cursor, cursor + len(item)
+                cursor += len(item) + 1
+        elif block.block_type == "table" and block.table:
+            rows = ([" | ".join(block.table.header)] if block.table.header else []) + [
+                " | ".join(row) for row in block.table.rows
+            ]
+            cursor = block.start_char
+            for row_text in rows:
+                yield cursor, cursor + len(row_text)
+                cursor += len(row_text) + 1
+
+
+def _split_into_sentences(start: int, end: int, text: str) -> Iterator[tuple[int, int]]:
+    """Split text[start:end] into contiguous, gap-free sentence spans (absolute offsets)."""
+    segment = text[start:end]
+    cursor = start
+    for match in _SENTENCE_BOUNDARY_RE.finditer(segment):
+        boundary = start + match.end()
+        yield cursor, boundary
+        cursor = boundary
+    yield cursor, end
+
+
+def _flatten_elements(
+    elements: Iterator[tuple[int, int]], max_chunk_size: int, text: str
+) -> Iterator[tuple[int, int]]:
+    for start, end in elements:
+        if end - start > max_chunk_size:
+            yield from _split_into_sentences(start, end, text)
+        else:
+            yield start, end
+
+
+def _pack_elements(pieces: Iterator[tuple[int, int]], max_chunk_size: int) -> Iterator[tuple[int, int]]:
+    current_start: int | None = None
+    current_end: int | None = None
+
+    for start, end in pieces:
+        if current_start is None:
+            current_start, current_end = start, end
+        elif end - current_start <= max_chunk_size:
+            current_end = end
+        else:
+            yield current_start, current_end
+            current_start, current_end = start, end
+
+    if current_start is not None:
+        yield current_start, current_end
+
+
+def _iter_structural_spans(document: NormalizedDocument, max_chunk_size: int) -> Iterator[tuple[int, int]]:
+    page_spans = _compute_page_spans(document)
+
+    def elements() -> Iterator[tuple[int, int]]:
+        for page, (_, page_start, _) in zip(document.pages, page_spans):
+            for local_start, local_end in _iter_page_structural_elements(page):
+                yield page_start + local_start, page_start + local_end
+
+    flattened = _flatten_elements(elements(), max_chunk_size, document.full_text)
+    yield from _pack_elements(flattened, max_chunk_size)
+
+
 def chunk_document(document: NormalizedDocument, config: ChunkingConfig | None = None) -> ChunkingResult:
-    """Chunk a NormalizedDocument's full_text into fixed-size, overlapping character chunks."""
+    """Chunk a NormalizedDocument's full_text using the configured chunking_strategy."""
     config = config or ChunkingConfig()
-    if config.chunking_strategy != DEFAULT_CHUNKING_STRATEGY:
+    if config.chunking_strategy == DEFAULT_CHUNKING_STRATEGY:
+        spans = _iter_char_spans(document.full_text, config.max_chunk_size, config.overlap_size)
+    elif config.chunking_strategy == STRUCTURAL_STRATEGY:
+        spans = _iter_structural_spans(document, config.max_chunk_size)
+    else:
         raise ValueError(f"Unsupported chunking_strategy: {config.chunking_strategy}")
 
     page_spans = _compute_page_spans(document)
     chunks = []
-    for start, end in _iter_char_spans(document.full_text, config.max_chunk_size, config.overlap_size):
+    for start, end in spans:
         chunk_text = document.full_text[start:end]
         if not chunk_text.strip():
             continue
