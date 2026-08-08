@@ -27,11 +27,11 @@ def main() -> None:
         print(f"Failed to load PDF: {exc}")
         sys.exit(1)
 
-    print(f"\nLoaded: {document.path}")
+    """print(f"\nLoaded: {document.path}")
     print(f"Document ID: {document.document_id or document.path.stem}")
     print(f"Document Type: {document.document_type or 'Not provided'}")
     print(f"Encrypted: {reader.is_encrypted}")
-    print(f"Pages: {len(reader.pages)}\n")
+    print(f"Pages: {len(reader.pages)}\n")"""
 
     try:
         extracted = extract_pdf(document, reader)
@@ -39,23 +39,23 @@ def main() -> None:
         print(f"Failed to extract PDF: {exc}")
         sys.exit(1)
 
-    print("Extraction complete: Raw text extracted from PDF pages.")
+    """print("Extraction complete: Raw text extracted from PDF pages.")
     #print(f"Full text: {extracted.full_text}")
     print(f"Extracted pages: {extracted.page_count}")
     print(f"Total words: {extracted.word_count}")
-    print(f"Total chars: {extracted.char_count}\n")
+    print(f"Total chars: {extracted.char_count}\n")"""
 
     normalized = normalize_document(extracted)
 
-    print("Normalization complete: Text cleaned and normalized.")
+    """print("Normalization complete: Text cleaned and normalized.")
     #print(f"Full text normalized: \n{normalized.full_text}\n") 
     print(f"Extracted normalized pages: {normalized.page_count}")
     print(f"Total normalized words: {normalized.word_count}")
-    print(f"Total normalized chars: {normalized.char_count}\n")
+    print(f"Total normalized chars: {normalized.char_count}\n")"""
 
     chunking_config = ChunkingConfig(max_chunk_size=1000, overlap_size=100)
     chunker = chunk_document(normalized, config=chunking_config)
-    print("Chunking complete: Document split into overlapping character chunks.")
+    """print("Chunking complete: Document split into overlapping character chunks.")
     print(f"Total chunks created: {len(chunker.chunks)}")
     print(f"Chunk 0 : range {chunker.chunks[0].start_char}-{chunker.chunks[0].end_char}: {chunker.chunks[0].char_count} chars, {chunker.chunks[0].word_count} words")
     print(f"Chunk 1 : range {chunker.chunks[1].start_char}-{chunker.chunks[1].end_char}: {chunker.chunks[1].char_count} chars, {chunker.chunks[1].word_count} words")
@@ -66,9 +66,11 @@ def main() -> None:
     print(f"Chunk 6 : range {chunker.chunks[6].start_char}-{chunker.chunks[6].end_char}: {chunker.chunks[6].char_count} chars, {chunker.chunks[6].word_count} words")
     print(f"Chunk 7 : range {chunker.chunks[7].start_char}-{chunker.chunks[7].end_char}: {chunker.chunks[7].char_count} chars, {chunker.chunks[7].word_count} words")
     print(f"Chunk 8 : range {chunker.chunks[8].start_char}-{chunker.chunks[8].end_char}: {chunker.chunks[8].char_count} chars, {chunker.chunks[8].word_count} words\n")
-
-    #print(f"Chunk 0: {chunker.chunks[0].text}")
-    #print(f"Chunk 1: {chunker.chunks[1].text}")
+"""
+    print(f"Chunk 0: {chunker.chunks[0].text}")
+    print(f"Chunk 1: {chunker.chunks[1].text}")
+    print(f"Chunk 2: {chunker.chunks[2].text}")
+    print(f"Chunk 3: {chunker.chunks[3].text}")
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:
