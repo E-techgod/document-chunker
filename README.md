@@ -50,7 +50,7 @@ Chunking runs against `normalized_text`, not the structured blocks — the point
 
 | Strategy | Source chars | Chunks | Chunk size | Overlap | Stride | Total chunk chars | Duplicate chars | Duplicate overhead % |
 |---|---|---|---|---|---|---|---|---|
-| Character (fixed-size, overlap) (max_chunks_size=1000, overlap_size (stride)=100)| 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
+| Character (fixed-size, overlap) (max_chunks_size=1000, overlap_size (step_size)=100)| 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
 
 ## Tests
 
