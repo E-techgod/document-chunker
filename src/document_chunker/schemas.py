@@ -5,9 +5,8 @@ from pydantic import BaseModel, field_validator, Field, field_validator, compute
 from document_chunker.counting import count_words
 
 NormalizationStrategy = Literal[
-    "conservative",
+    "characters",
     "structural",
-    "layout_preserving",
 ]
 
 class PDFDocumentInput(BaseModel):
@@ -124,8 +123,8 @@ class NormalizedDocument(BaseModel):
 
 class ChunkingConfig(BaseModel): # The rules: How to chunk the document into smaller pieces for processing
     max_chunk_size: int = Field(default=1000, ge=1)
-    overlap_size: int = Field(default=200, ge=0)
-    chunking_strategy: str = "characters"
+    overlap_size: int = Field(default=100, ge=0)
+    chunking_strategy: Literal["characters", "structural"] = "structural"
 
 class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represents a chunk of a document, with metadata and content
     document_id: str
