@@ -8,6 +8,7 @@ from src.document_chunker.schemas import PDFDocumentInput
 from src.document_chunker.normalizer import normalize_document, normalize_text
 from src.document_chunker.counting import count_words
 from src.document_chunker.chunker import chunk_document, ChunkingConfig, ChunkingResult, DocumentChunk, NormalizedDocument
+from src.document_chunker.evaluator import validate_chunks
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
@@ -52,11 +53,21 @@ def main() -> None:
     print(f"Total normalized words: {normalized.word_count}")
     print(f"Total normalized chars: {normalized.char_count}\n")
 
-    chunker = chunk_document(normalized, config=ChunkingConfig(max_chunk_size=1000, overlap_size=100))
+    chunking_config = ChunkingConfig(max_chunk_size=1000, overlap_size=100)
+    chunker = chunk_document(normalized, config=chunking_config)
     print("Chunking complete: Document split into overlapping character chunks.\n")
     print(f"Total chunks created: {len(chunker.chunks)}")
     print(f"First chunk text: \n{chunker.chunks[0].text}\n")
     #rint(f"Last chunk text: \n{chunker.chunks[-1].text}\n")
+
+    report = validate_chunks(normalized, chunker, chunking_config)
+    if report.is_valid:
+        print("Chunk validation passed: all invariants hold.\n")
+    else:
+        print(f"Chunk validation FAILED: {len(report.issues)} issue(s) found.")
+        for issue in report.issues:
+            print(f"  [{issue.invariant}] chunk_index={issue.chunk_index}: {issue.message}")
+        sys.exit(1)
 
     """ Saftery Checks for the extracted document to ensure consistency and correctness.
     full_text = "\n\n".join(page.text for page in extracted.pages)
