@@ -163,5 +163,19 @@ class ChunkingResult(BaseModel): # The whole chunking output: Represents the who
 
     @computed_field
     @property
-    def total_char_count(self) -> int: 
+    def total_char_count(self) -> int:
         return sum(chunk.char_count for chunk in self.chunks)
+
+class ChunkValidationIssue(BaseModel): # One broken invariant, tied to the chunk (if any) where it was found
+    invariant: str
+    chunk_index: int | None = None
+    message: str
+
+class ChunkValidationReport(BaseModel): # The full set of invariant violations found for one ChunkingResult
+    document_id: str
+    issues: list[ChunkValidationIssue] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def is_valid(self) -> bool:
+        return not self.issues
