@@ -1,3 +1,4 @@
+from document_chunker.chunker import STRUCTURAL_STRATEGY, structural_elements, structural_pieces
 from document_chunker.schemas import (
     ChunkingConfig,
     ChunkingResult,
@@ -10,9 +11,12 @@ from document_chunker.schemas import (
 ORDER = "order_preservation"
 MAX_SIZE = "max_size"
 OVERLAP = "overlap"
-COVERAGE = "coverage"
+NON_WHITESPACE_COVERAGE = "non_whitespace_coverage"
 TRACEABILITY = "traceability"
 OFFSETS = "offsets"
+STRUCTURAL_INTEGRITY = "structural_integrity"
+ELEMENT_ORDER = "element_order"
+ATOMIC_ELEMENT_COVERAGE = "atomic_element_coverage"
 
 
 def _check_order(chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
@@ -27,20 +31,42 @@ def _check_order(chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
     ]
 
 
-def _check_max_size(chunks: list[DocumentChunk], config: ChunkingConfig) -> list[ChunkValidationIssue]:
-    # The structural strategy treats max_chunk_size as a soft target: a single
-    # unsplittable sentence/element is kept whole even if it overflows the limit.
-    if config.chunking_strategy == "structural":
-        return []
-    return [
-        ChunkValidationIssue(
-            invariant=MAX_SIZE,
-            chunk_index=chunk.chunk_index,
-            message=f"chunk text length {len(chunk.text)} exceeds max_chunk_size {config.max_chunk_size}",
+def _check_max_size(
+    chunks: list[DocumentChunk], config: ChunkingConfig, pieces: list[tuple[int, int]]
+) -> list[ChunkValidationIssue]:
+    if config.chunking_strategy != STRUCTURAL_STRATEGY:
+        return [
+            ChunkValidationIssue(
+                invariant=MAX_SIZE,
+                chunk_index=chunk.chunk_index,
+                message=f"chunk text length {len(chunk.text)} exceeds max_chunk_size {config.max_chunk_size}",
+            )
+            for chunk in chunks
+            if len(chunk.text) > config.max_chunk_size
+        ]
+
+    # Structural chunks may only exceed max_chunk_size when they are exactly one
+    # atomic element/sentence that was itself too big to split further — never
+    # when several elements were packed together.
+    oversized_pieces = {(start, end) for start, end in pieces if end - start > config.max_chunk_size}
+    issues = []
+    for chunk in chunks:
+        size = chunk.end_char - chunk.start_char
+        if size <= config.max_chunk_size:
+            continue
+        if (chunk.start_char, chunk.end_char) in oversized_pieces:
+            continue
+        issues.append(
+            ChunkValidationIssue(
+                invariant=MAX_SIZE,
+                chunk_index=chunk.chunk_index,
+                message=(
+                    f"chunk text length {size} exceeds max_chunk_size {config.max_chunk_size} "
+                    "and is not a single oversized structural element"
+                ),
+            )
         )
-        for chunk in chunks
-        if len(chunk.text) > config.max_chunk_size
-    ]
+    return issues
 
 
 def _check_overlap(chunks: list[DocumentChunk], config: ChunkingConfig) -> list[ChunkValidationIssue]:
@@ -70,7 +96,8 @@ def _check_overlap(chunks: list[DocumentChunk], config: ChunkingConfig) -> list[
     return issues
 
 
-def _check_coverage(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
+def _check_non_whitespace_coverage(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
+    """Any source region not covered by a chunk must contain only whitespace."""
     issues = []
     spans = sorted((chunk.start_char, chunk.end_char) for chunk in chunks)
     cursor = 0
@@ -80,7 +107,7 @@ def _check_coverage(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkVa
             if gap_text.strip():
                 issues.append(
                     ChunkValidationIssue(
-                        invariant=COVERAGE,
+                        invariant=NON_WHITESPACE_COVERAGE,
                         chunk_index=None,
                         message=f"full_text[{cursor}:{start}] is not covered by any chunk: {gap_text!r}",
                     )
@@ -92,7 +119,7 @@ def _check_coverage(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkVa
         if gap_text.strip():
             issues.append(
                 ChunkValidationIssue(
-                    invariant=COVERAGE,
+                    invariant=NON_WHITESPACE_COVERAGE,
                     chunk_index=None,
                     message=f"full_text[{cursor}:{len(full_text)}] is not covered by any chunk: {gap_text!r}",
                 )
@@ -156,18 +183,99 @@ def _check_offsets(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkVal
     return issues
 
 
+def _check_element_order(elements: list[tuple[int, int]]) -> list[ChunkValidationIssue]:
+    """Structural elements must remain in source order (non-overlapping, strictly forward)."""
+    issues = []
+    for previous, current in zip(elements, elements[1:]):
+        if current[0] < previous[1]:
+            issues.append(
+                ChunkValidationIssue(
+                    invariant=ELEMENT_ORDER,
+                    chunk_index=None,
+                    message=(
+                        f"structural element {current} starts before the previous element "
+                        f"{previous} ends"
+                    ),
+                )
+            )
+    return issues
+
+
+def _check_atomic_element_coverage(
+    elements: list[tuple[int, int]], chunks: list[DocumentChunk], max_chunk_size: int
+) -> list[ChunkValidationIssue]:
+    """Every structural element that fits within max_chunk_size must appear in exactly one
+    chunk. An oversized element is exempt here: it's intentionally spread across the chunks
+    holding its sentence-split pieces (checked instead by structural integrity)."""
+    issues = []
+    for start, end in elements:
+        if end <= start or end - start > max_chunk_size:
+            continue
+        containing = [chunk for chunk in chunks if chunk.start_char <= start and end <= chunk.end_char]
+        if len(containing) != 1:
+            issues.append(
+                ChunkValidationIssue(
+                    invariant=ATOMIC_ELEMENT_COVERAGE,
+                    chunk_index=None,
+                    message=(
+                        f"structural element [{start}:{end}] is fully contained in "
+                        f"{len(containing)} chunks, expected exactly 1"
+                    ),
+                )
+            )
+    return issues
+
+
+def _check_structural_integrity(
+    pieces: list[tuple[int, int]], chunks: list[DocumentChunk]
+) -> list[ChunkValidationIssue]:
+    """No word, sentence, bullet, or table row is split unless fallback logic requires it:
+    every chunk boundary must land on a structural element/sentence-piece boundary."""
+    boundaries = {start for start, _ in pieces} | {end for _, end in pieces}
+
+    issues = []
+    for chunk in chunks:
+        if chunk.start_char not in boundaries:
+            issues.append(
+                ChunkValidationIssue(
+                    invariant=STRUCTURAL_INTEGRITY,
+                    chunk_index=chunk.chunk_index,
+                    message=f"chunk start_char {chunk.start_char} splits a structural element",
+                )
+            )
+        if chunk.end_char not in boundaries:
+            issues.append(
+                ChunkValidationIssue(
+                    invariant=STRUCTURAL_INTEGRITY,
+                    chunk_index=chunk.chunk_index,
+                    message=f"chunk end_char {chunk.end_char} splits a structural element",
+                )
+            )
+    return issues
+
+
 def validate_chunks(
     document: NormalizedDocument,
     result: ChunkingResult,
     config: ChunkingConfig,
 ) -> ChunkValidationReport:
     """Check a ChunkingResult against the chunking invariants, collecting every violation found."""
+    is_structural = config.chunking_strategy == STRUCTURAL_STRATEGY
+    elements = structural_elements(document) if is_structural else []
+    pieces = structural_pieces(document, config.max_chunk_size) if is_structural else []
+
     issues = [
         *_check_order(result.chunks),
-        *_check_max_size(result.chunks, config),
+        *_check_max_size(result.chunks, config, pieces),
         *_check_overlap(result.chunks, config),
-        *_check_coverage(document.full_text, result.chunks),
+        *_check_non_whitespace_coverage(document.full_text, result.chunks),
         *_check_traceability(document.full_text, result.chunks),
         *_check_offsets(document.full_text, result.chunks),
     ]
+    if is_structural:
+        issues += [
+            *_check_element_order(elements),
+            *_check_atomic_element_coverage(elements, result.chunks, config.max_chunk_size),
+            *_check_structural_integrity(pieces, result.chunks),
+        ]
     return ChunkValidationReport(document_id=document.document_id, issues=issues)

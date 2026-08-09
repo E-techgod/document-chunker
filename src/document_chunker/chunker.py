@@ -116,16 +116,25 @@ def _pack_elements(pieces: Iterator[tuple[int, int]], max_chunk_size: int) -> It
         yield current_start, current_end
 
 
-def _iter_structural_spans(document: NormalizedDocument, max_chunk_size: int) -> Iterator[tuple[int, int]]:
+def structural_elements(document: NormalizedDocument) -> list[tuple[int, int]]:
+    """Document-order (start, end) spans, in full_text, for every atomic structural unit
+    (heading, paragraph, list item, table row) — before any size-based splitting."""
     page_spans = _compute_page_spans(document)
+    return [
+        (page_start + local_start, page_start + local_end)
+        for page, (_, page_start, _) in zip(document.pages, page_spans)
+        for local_start, local_end in _iter_page_structural_elements(page)
+    ]
 
-    def elements() -> Iterator[tuple[int, int]]:
-        for page, (_, page_start, _) in zip(document.pages, page_spans):
-            for local_start, local_end in _iter_page_structural_elements(page):
-                yield page_start + local_start, page_start + local_end
 
-    flattened = _flatten_elements(elements(), max_chunk_size, document.full_text)
-    yield from _pack_elements(flattened, max_chunk_size)
+def structural_pieces(document: NormalizedDocument, max_chunk_size: int) -> list[tuple[int, int]]:
+    """structural_elements(), with any element longer than max_chunk_size further split at
+    sentence boundaries. These are the exact units chunk_document packs into chunks."""
+    return list(_flatten_elements(iter(structural_elements(document)), max_chunk_size, document.full_text))
+
+
+def _iter_structural_spans(document: NormalizedDocument, max_chunk_size: int) -> Iterator[tuple[int, int]]:
+    yield from _pack_elements(iter(structural_pieces(document, max_chunk_size)), max_chunk_size)
 
 
 def chunk_document(document: NormalizedDocument, config: ChunkingConfig | None = None) -> ChunkingResult:
