@@ -9,13 +9,14 @@ from src.document_chunker.normalizer import normalize_document, normalize_text
 from src.document_chunker.counting import count_words
 from src.document_chunker.chunker import chunk_document, ChunkingConfig
 from src.document_chunker.evaluator import validate_chunks
-CHUNKING_STRATEGY = "structural"  # characters | structural
-V2_CARRY_CONTEXT = False # structural only, TRUE to activate (v2.2); FALSE ignored for "characters" 
+from src.document_chunker.chunking_strategies import get_chunking_strategy, describe_chunking
+ACTIVE_CHUNKING_STRATEGY = "v2.2" # v1.0: character chunking with overlap, v2.1: structural chunking with no context carry, v2.2: structural chunking with context carry
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
     path = sys.argv[1] if len(sys.argv) > 1 else "data/sample.pdf"
     password = sys.argv[2] if len(sys.argv) > 2 else ""
+    strategy_label, chunking_config = get_chunking_strategy(ACTIVE_CHUNKING_STRATEGY)
 
     try:
         document = PDFDocumentInput(path=Path(path))
@@ -55,27 +56,34 @@ def main() -> None:
     print(f"Total normalized words: {normalized.word_count}")
     print(f"Total normalized chars: {normalized.char_count}\n")"""
 
-    chunking_config = ChunkingConfig(max_chunk_size=1000, overlap_size=0, chunking_strategy=CHUNKING_STRATEGY, propagate_context=V2_CARRY_CONTEXT) # For structural chunking, set overlap_size to 0; for character-based chunking, you can set it to a positive value (e.g., 200)
     chunker = chunk_document(normalized, config=chunking_config)
-    print("Chunking complete: Document split into overlapping structural chunks.") # Change to "overlapping character chunks" if using character-based chunking
+    print(
+        f"Chunking strategy: {ACTIVE_CHUNKING_STRATEGY} ({strategy_label})"
+    )
+    print(
+        "Chunking config: "
+        f"strategy={chunking_config.chunking_strategy}, "
+        f"max_chunk_size={chunking_config.max_chunk_size}, "
+        f"overlap_size={chunking_config.overlap_size}, "
+        f"propagate_context={chunking_config.propagate_context}"
+    )
+    print(
+        f"Chunking complete: Document split into {describe_chunking(chunking_config)}."
+    )
     print(f"Chunk-covered spans in full_text: {[(chunk.start_char, chunk.end_char) for chunk in chunker.chunks]}")
     print(f"Whitespace-only chunks (should be empty): {[chunk for chunk in chunker.chunks if not chunk.text.strip()]}")
     print(f"Non-whitespace content lost (should be empty): {normalized.full_text[0:chunker.chunks[0].start_char]}{normalized.full_text[chunker.chunks[-1].end_char:]}")
     print(f"Total chunks created: {len(chunker.chunks)}")
-    print(f"Chunk 0 : range {chunker.chunks[0].start_char}-{chunker.chunks[0].end_char}: {chunker.chunks[0].char_count} chars, {chunker.chunks[0].word_count} words")
-    print(f"Chunk 1 : range {chunker.chunks[1].start_char}-{chunker.chunks[1].end_char}: {chunker.chunks[1].char_count} chars, {chunker.chunks[1].word_count} words")
-    print(f"Chunk 2 : range {chunker.chunks[2].start_char}-{chunker.chunks[2].end_char}: {chunker.chunks[2].char_count} chars, {chunker.chunks[2].word_count} words")
-    print(f"Chunk 3 : range {chunker.chunks[3].start_char}-{chunker.chunks[3].end_char}: {chunker.chunks[3].char_count} chars, {chunker.chunks[3].word_count} words")
-    print(f"Chunk 4 : range {chunker.chunks[4].start_char}-{chunker.chunks[4].end_char}: {chunker.chunks[4].char_count} chars, {chunker.chunks[4].word_count} words")
-    print(f"Chunk 5 : range {chunker.chunks[5].start_char}-{chunker.chunks[5].end_char}: {chunker.chunks[5].char_count} chars, {chunker.chunks[5].word_count} words")
-    print(f"Chunk 6 : range {chunker.chunks[6].start_char}-{chunker.chunks[6].end_char}: {chunker.chunks[6].char_count} chars, {chunker.chunks[6].word_count} words")
-    print(f"Chunk 7 : range {chunker.chunks[7].start_char}-{chunker.chunks[7].end_char}: {chunker.chunks[7].char_count} chars, {chunker.chunks[7].word_count} words")
-    #print(f"Chunk 8 : range {chunker.chunks[8].start_char}-{chunker.chunks[8].end_char}: {chunker.chunks[8].char_count} chars, {chunker.chunks[8].word_count} words\n") Uncomment when using character strategy
+    for chunk in chunker.chunks:
+        print(
+            f"Chunk {chunk.chunk_index} : range {chunk.start_char}-{chunk.end_char}: "
+            f"{chunk.char_count} chars, {chunk.word_count} words"
+        )
 
-    print(f" ----------------------------------------------------------------------- Chunk 0 ----------------------------------------------------------------------- \n{chunker.chunks[0].text}\n")
-    print(f" ----------------------------------------------------------------------- Chunk 1 ----------------------------------------------------------------------- \n{chunker.chunks[1].text}\n")
-    print(f" ----------------------------------------------------------------------- Chunk 2 ----------------------------------------------------------------------- \n{chunker.chunks[2].text}\n")
-    print(f" ----------------------------------------------------------------------- Chunk 3 ----------------------------------------------------------------------- \n{chunker.chunks[3].text}\n")
+    for chunk in chunker.chunks[:4]:
+        print(
+            f" ----------------------------------------------------------------------- Chunk {chunk.chunk_index} ----------------------------------------------------------------------- \n{chunk.text}\n"
+        )
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:
