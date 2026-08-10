@@ -82,8 +82,11 @@ def main() -> None:
 
     for chunk in chunker.chunks[:4]:
         print(
-            f" ----------------------------------------------------------------------- Chunk {chunk.chunk_index} ----------------------------------------------------------------------- \n{chunk.text}\n"
+            f" ----------------------------------------------------------------------- Chunk {chunk.chunk_index} ----------------------------------------------------------------------- "
         )
+        if chunk.context_prefix:
+            print(f"[context]\n{chunk.context_prefix}")
+        print(f"[content]\n{chunk.text}\n")
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:
