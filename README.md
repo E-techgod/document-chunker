@@ -130,7 +130,7 @@ Defaults to `data/sample.pdf` with no password if no arguments are given. It wal
 
 ## Strategy Comparison
 
-Chunking runs against `normalized_text`, not the structured blocks — the point is to have a baseline that later strategies (structure-aware, semantic, etc.) can be measured against on the exact same normalized input. Metrics below are computed on `data/sample.pdf` with `ChunkingConfig(max_chunk_size=1000, overlap_size=100)`, the default `main.py` runs.
+Chunking runs against `normalized_text`, not the structured blocks — the point is to have a baseline that later strategies (structure-aware, semantic, etc.) can be measured against on the exact same normalized input. Metrics below are computed on `data/sample.pdf` using the per-strategy configs shown in the table.
 
 - **Chunk size / Overlap / Stride** — the configured `max_chunk_size` / `overlap_size`, and the derived step between chunk starts (`stride = chunk_size - overlap`).
 - **Total chunk characters** — sum of every chunk's `char_count` (`ChunkingResult.total_char_count`). Overlapping regions get counted once per chunk that contains them, so this is normally >= source characters for overlap-based chunking, but can be slightly lower for structural chunking if boundary-only whitespace is omitted.
@@ -141,6 +141,7 @@ Chunking runs against `normalized_text`, not the structured blocks — the point
 |---|---|---|---|---|---|---|---|---|
 | Character (fixed-size, overlap) (max_chunks_size=1000, overlap_size (step_size)=100)| 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
 | Structural v2.1 (no context carry) | 7,576 | 8 | 1000 | 0 | 1000 | 7,567 | NA | NA |
+| Structural v2.2 (with context carry) | 7,576 | 8 | 1000 | 0 | 1000 | 7,568 | -8 | -0.11% |
 
 ## Tests
 
