@@ -307,6 +307,45 @@ def test_table_continuation_gets_heading_and_header_row_prepended(make_extract_d
         assert chunk.text.count("Name | Role | Score") == 0
 
 
+def test_table_split_across_page_break_inherits_header_from_previous_page(make_extract_document):
+    # normalize_page runs per-page, so a table that continues onto the next page becomes
+    # two blocks: page 1's has the header, page 2's starts straight into data rows and
+    # has no header of its own (a numeric first row can never look like a header row).
+    document = _normalized(
+        make_extract_document,
+        [
+            "SALES REPORT\n\nName | Region | Amount\nAlice | East | 100\nBob | West | 200\n",
+            "Carl | North | 150\nDana | South | 175\n",
+        ],
+    )
+    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    page_two_chunks = [c for c in result.chunks if 2 in c.page_numbers]
+    assert page_two_chunks
+    for chunk in page_two_chunks:
+        assert chunk.context_prefix == "SALES REPORT\nName | Region | Amount"
+
+
+def test_table_continuation_header_resets_after_non_table_block(make_extract_document):
+    # An unrelated table on page 2, separated from page 1's table by a paragraph, must
+    # not inherit page 1's header - the run of table units is broken by the paragraph.
+    document = _normalized(
+        make_extract_document,
+        [
+            "Name | Region | Amount\nAlice | East | 100\n",
+            "This is an unrelated paragraph that closes out the section for readers today.\n\nX | Y\n1 | 2\n",
+        ],
+    )
+    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    unrelated_table_chunk = next(c for c in result.chunks if c.text.startswith("1 | 2"))
+    assert "Name | Region | Amount" not in unrelated_table_chunk.context_prefix
+
+
 def test_no_heading_falls_back_to_previous_units_text(make_extract_document):
     text = "- alpha item\n- beta item\n- gamma item\n"
     document = _normalized(make_extract_document, [text])

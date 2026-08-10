@@ -9,7 +9,8 @@ from src.document_chunker.normalizer import normalize_document, normalize_text
 from src.document_chunker.counting import count_words
 from src.document_chunker.chunker import chunk_document, ChunkingConfig
 from src.document_chunker.evaluator import validate_chunks
-CHUNKING_STRATEGY = "structural"  # characters | structural 
+CHUNKING_STRATEGY = "structural"  # characters | structural
+V2_CARRY_CONTEXT = True # structural only, TRUE to activate (v2.2); FALSE ignored for "characters" 
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
@@ -54,7 +55,7 @@ def main() -> None:
     print(f"Total normalized words: {normalized.word_count}")
     print(f"Total normalized chars: {normalized.char_count}\n")"""
 
-    chunking_config = ChunkingConfig(max_chunk_size=1000, overlap_size=0, chunking_strategy=CHUNKING_STRATEGY) # For structural chunking, set overlap_size to 0; for character-based chunking, you can set it to a positive value (e.g., 200)
+    chunking_config = ChunkingConfig(max_chunk_size=1000, overlap_size=0, chunking_strategy=CHUNKING_STRATEGY, propagate_context=V2_CARRY_CONTEXT) # For structural chunking, set overlap_size to 0; for character-based chunking, you can set it to a positive value (e.g., 200)
     chunker = chunk_document(normalized, config=chunking_config)
     print("Chunking complete: Document split into overlapping structural chunks.") # Change to "overlapping character chunks" if using character-based chunking
     print(f"Chunk-covered spans in full_text: {[(chunk.start_char, chunk.end_char) for chunk in chunker.chunks]}")

@@ -166,7 +166,11 @@ def _iter_structural_spans(document: NormalizedDocument, max_chunk_size: int) ->
 
 def _document_units(document: NormalizedDocument) -> list[_Unit]:
     """structural_elements(), enriched with each unit's governing heading text (the nearest
-    preceding heading, tracked in a single document-order pass so it correctly spans pages)."""
+    preceding heading, tracked in a single document-order pass so it correctly spans pages)
+    and, for table rows, the table's header text. A table split across a page break is
+    normalized into two blocks (normalize_page runs per-page), and the second one has no
+    header row of its own - so the header is inherited across an unbroken run of table
+    units, the same way headings already propagate across pages."""
     page_spans = _compute_page_spans(document)
     units = [
         replace(unit, start=page_start + unit.start, end=page_start + unit.end)
@@ -175,13 +179,24 @@ def _document_units(document: NormalizedDocument) -> list[_Unit]:
     ]
 
     current_heading: str | None = None
+    current_table_header: str | None = None
     annotated: list[_Unit] = []
     for unit in units:
         if unit.block_type == "heading":
             annotated.append(unit)
             current_heading = document.full_text[unit.start : unit.end]
+            current_table_header = None
+        elif unit.block_type == "table":
+            if unit.table_header_text is not None:
+                current_table_header = unit.table_header_text
+                annotated.append(replace(unit, heading_text=current_heading))
+            else:
+                annotated.append(
+                    replace(unit, heading_text=current_heading, table_header_text=current_table_header)
+                )
         else:
             annotated.append(replace(unit, heading_text=current_heading))
+            current_table_header = None
     return annotated
 
 

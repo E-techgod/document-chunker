@@ -106,7 +106,7 @@ class NormalizedDocument(BaseModel):
     full_text: str
     normalized_strategy: str | None = None
    
-    @computed_field
+    @computed_field # Validation to ensure that the page_count is equal to the length of the pages list
     @property
     def page_count(self) -> int:
         return len(self.pages)
@@ -125,7 +125,7 @@ class ChunkingConfig(BaseModel): # The rules: How to chunk the document into sma
     max_chunk_size: int = Field(default=1000, ge=1)
     overlap_size: int = Field(default=100, ge=0)
     chunking_strategy: Literal["characters", "structural"] = "characters"
-    propagate_context: bool = True  # structural only (v2.2); ignored for "characters"
+    propagate_context: bool = False  # structural only, TRUE to activate (v2.2); ignored for "characters"
 
 class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represents a chunk of a document, with metadata and content
     document_id: str
