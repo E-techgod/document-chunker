@@ -157,6 +157,58 @@ def test_oversized_chunk_from_multiple_packed_elements_is_still_flagged_under_st
     assert any(issue.invariant == MAX_SIZE for issue in report.issues)
 
 
+def test_forced_table_header_row_pair_is_not_flagged_under_context_propagation(make_extract_document):
+    # A table header row that can't share a chunk with even one row gets forced to pair
+    # with the next row anyway (see chunker._pack_table_run), rather than ever being
+    # emitted alone. That forced pair is a legitimate oversized exception, like a single
+    # unsplittable element.
+    header = "A_Very_Long_Column_Name_One | Another_Extremely_Long_Column_Name_Two | Third_Column"
+    text = f"{header}\n1 | 2 | 3\n4 | 5 | 6\n"
+    document = normalize_document(make_extract_document([text]))
+    config = ChunkingConfig(
+        max_chunk_size=len(header) + 5, overlap_size=0, chunking_strategy="structural", propagate_context=True
+    )
+    result = chunk_document(document, config)
+    forced_chunk = next(c for c in result.chunks if c.text.startswith(header))
+    assert (forced_chunk.end_char - forced_chunk.start_char) > config.max_chunk_size  # sanity check
+
+    report = validate_chunks(document, result, config)
+
+    assert report.is_valid
+    assert not any(issue.invariant == MAX_SIZE for issue in report.issues)
+
+
+def test_oversized_multi_row_table_chunk_is_still_flagged_under_context_propagation(make_extract_document):
+    # A chunk spanning a header plus two rows, when header+first-row alone would already
+    # have fit, is not a legitimate forced pairing - it's still a bug and must be flagged.
+    text = "X | Y\n1 | 2\n3 | 4\n"
+    document = normalize_document(make_extract_document([text]))
+    config = ChunkingConfig(max_chunk_size=10, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    result = ChunkingResult(
+        document_id=document.document_id,
+        file_name=document.file_name,
+        file_path=document.file_path,
+        chunking_strategy="structural",
+        chunks=[
+            DocumentChunk(
+                document_id=document.document_id,
+                chunk_id="doc1_chunk_0",
+                chunk_index=0,
+                start_char=0,
+                end_char=len(document.full_text),
+                text=document.full_text,
+                word_count=1,
+                char_count=len(document.full_text),
+            ),
+        ],
+    )
+
+    report = validate_chunks(document, result, config)
+
+    assert not report.is_valid
+    assert any(issue.invariant == MAX_SIZE for issue in report.issues)
+
+
 # --- invariant 3: correct overlap ---
 
 

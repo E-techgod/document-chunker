@@ -342,8 +342,55 @@ def test_table_continuation_header_resets_after_non_table_block(make_extract_doc
 
     result = chunk_document(document, config)
 
-    unrelated_table_chunk = next(c for c in result.chunks if c.text.startswith("1 | 2"))
+    # The header row is no longer left stranded alone (v2.2 fix): it now packs together
+    # with its own row in one chunk rather than repeating a fallback context that would
+    # have leaked page 1's unrelated header.
+    unrelated_table_chunk = next(c for c in result.chunks if "1 | 2" in c.text)
     assert "Name | Region | Amount" not in unrelated_table_chunk.context_prefix
+    assert "Name | Region | Amount" not in unrelated_table_chunk.text
+
+
+def test_table_header_never_emitted_alone_when_it_cannot_share_a_chunk_with_a_row(make_extract_document):
+    # The header row alone fits under max_chunk_size, but header + even one data row does
+    # not. The header must never open a chunk with zero rows attached to it - instead the
+    # next row is forced in anyway, and that chunk is allowed to exceed max_chunk_size.
+    header = "A_Very_Long_Column_Name_One | Another_Extremely_Long_Column_Name_Two | Third_Column"
+    row1 = "1 | 2 | 3"
+    row2 = "4 | 5 | 6"
+    text = f"{header}\n{row1}\n{row2}\n"
+    document = _normalized(make_extract_document, [text])
+    max_chunk_size = len(header) + 5
+    config = ChunkingConfig(
+        max_chunk_size=max_chunk_size, overlap_size=0, chunking_strategy="structural", propagate_context=True
+    )
+
+    result = chunk_document(document, config)
+
+    header_only_chunks = [c for c in result.chunks if c.text.strip() == header]
+    assert header_only_chunks == []
+
+    first_chunk = next(c for c in result.chunks if c.text.startswith(header))
+    assert first_chunk.text == f"{header}\n{row1}"
+    assert first_chunk.context_prefix == ""
+    assert (first_chunk.end_char - first_chunk.start_char) > max_chunk_size
+
+    second_chunk = next(c for c in result.chunks if row2 in c.text)
+    assert second_chunk.context_prefix == header
+    assert row1 not in second_chunk.text
+
+
+def test_table_header_and_row_pack_together_when_they_fit(make_extract_document):
+    # The normal, common case: header + row comfortably fit together, so no forcing is
+    # needed and the chunk stays within max_chunk_size.
+    text = "Name | Role | Score\nAlice | Engineer | 90\n"
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(max_chunk_size=1000, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    assert len(result.chunks) == 1
+    assert result.chunks[0].text == "Name | Role | Score\nAlice | Engineer | 90"
+    assert result.chunks[0].end_char - result.chunks[0].start_char <= config.max_chunk_size
 
 
 def test_no_heading_falls_back_to_previous_units_text(make_extract_document):

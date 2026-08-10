@@ -1,4 +1,9 @@
-from document_chunker.chunker import STRUCTURAL_STRATEGY, structural_elements, structural_pieces
+from document_chunker.chunker import (
+    STRUCTURAL_STRATEGY,
+    oversized_table_header_pairs,
+    structural_elements,
+    structural_pieces,
+)
 from document_chunker.schemas import (
     ChunkingConfig,
     ChunkingResult,
@@ -32,7 +37,10 @@ def _check_order(chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
 
 
 def _check_max_size(
-    chunks: list[DocumentChunk], config: ChunkingConfig, pieces: list[tuple[int, int]]
+    chunks: list[DocumentChunk],
+    config: ChunkingConfig,
+    pieces: list[tuple[int, int]],
+    header_pairs: list[tuple[int, int]] = (),
 ) -> list[ChunkValidationIssue]:
     if config.chunking_strategy != STRUCTURAL_STRATEGY:
         return [
@@ -46,9 +54,11 @@ def _check_max_size(
         ]
 
     # Structural chunks may only exceed max_chunk_size when they are exactly one
-    # atomic element/sentence that was itself too big to split further — never
-    # when several elements were packed together.
+    # atomic element/sentence that was itself too big to split further, or a table
+    # header row forced to pair with its first data row (header_pairs) - never when
+    # several elements were packed together by choice.
     oversized_pieces = {(start, end) for start, end in pieces if end - start > config.max_chunk_size}
+    oversized_pieces |= set(header_pairs)
     issues = []
     for chunk in chunks:
         size = chunk.end_char - chunk.start_char
@@ -263,10 +273,17 @@ def validate_chunks(
     is_structural = config.chunking_strategy == STRUCTURAL_STRATEGY
     elements = structural_elements(document) if is_structural else []
     pieces = structural_pieces(document, config.max_chunk_size) if is_structural else []
+    # The forced header+row pairing only happens in the context-propagation packer
+    # (_pack_table_run); plain structural chunking never produces it.
+    header_pairs = (
+        oversized_table_header_pairs(document, config.max_chunk_size)
+        if is_structural and config.propagate_context
+        else []
+    )
 
     issues = [
         *_check_order(result.chunks),
-        *_check_max_size(result.chunks, config, pieces),
+        *_check_max_size(result.chunks, config, pieces, header_pairs),
         *_check_overlap(result.chunks, config),
         *_check_non_whitespace_coverage(document.full_text, result.chunks),
         *_check_traceability(document.full_text, result.chunks),

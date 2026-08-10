@@ -225,6 +225,62 @@ def _resolve_context_prefix(unit: _Unit, previous_unit: _Unit | None, full_text:
     return "\n".join(parts)
 
 
+def _pack_table_run(
+    units: list[_Unit], start_index: int, max_chunk_size: int, full_text: str, previous_unit: _Unit | None
+) -> tuple[list[tuple[int, int, str]], int, _Unit | None]:
+    """State machine for a contiguous run of table units (a header row, if any, followed by
+    its data rows - `unit.table_header_text` already carries the header across a page-break
+    continuation, see _document_units). The header is kept "in memory" via that field and
+    re-applied as context_prefix on every chunk after the first that opens mid-table, via the
+    same _resolve_context_prefix used elsewhere. A bare header row is never left to open a
+    chunk alone: if not even one data row fits alongside it, the next row is forced in anyway
+    - that header+row pair becomes an oversized structural element (see
+    oversized_table_header_pairs), allowed to exceed max_chunk_size, rather than ever emitting
+    a chunk that repeats only the header with no content."""
+    chunks: list[tuple[int, int, str]] = []
+    index = start_index
+
+    while index < len(units) and units[index].block_type == "table":
+        leading = units[index]
+        context_prefix = _resolve_context_prefix(leading, previous_unit, full_text)
+        reserved = len(context_prefix) + 1 if context_prefix else 0
+        budget = max(max_chunk_size - reserved, leading.end - leading.start)
+
+        current_start, current_end = leading.start, leading.end
+        index += 1
+        while index < len(units) and units[index].block_type == "table" and units[index].end - current_start <= budget:
+            current_end = units[index].end
+            index += 1
+
+        if leading.is_table_header_row and current_end == leading.end and index < len(units) and units[index].block_type == "table":
+            current_end = units[index].end
+            index += 1
+
+        chunks.append((current_start, current_end, context_prefix))
+        previous_unit = units[index - 1]
+
+    return chunks, index, previous_unit
+
+
+def oversized_table_header_pairs(document: NormalizedDocument, max_chunk_size: int) -> list[tuple[int, int]]:
+    """Spans where a table's header row is forced to share a chunk with its first data row
+    even though the pair exceeds max_chunk_size - the header alone couldn't share a chunk
+    with even one row, so _pack_table_run pairs it with the next row regardless of size. The
+    evaluator must allow these the same way it already allows a single oversized element."""
+    units = _document_units(document)
+    pairs: list[tuple[int, int]] = []
+    for index, unit in enumerate(units):
+        if not unit.is_table_header_row:
+            continue
+        following_index = index + 1
+        if following_index >= len(units) or units[following_index].block_type != "table":
+            continue
+        following = units[following_index]
+        if following.end - unit.start > max_chunk_size:
+            pairs.append((unit.start, following.end))
+    return pairs
+
+
 def _pack_units_with_context(
     units: list[_Unit], max_chunk_size: int, full_text: str
 ) -> Iterator[tuple[int, int, str]]:
@@ -233,6 +289,13 @@ def _pack_units_with_context(
 
     while index < len(units):
         leading = units[index]
+        if leading.block_type == "table":
+            table_chunks, index, previous_unit = _pack_table_run(
+                units, index, max_chunk_size, full_text, previous_unit
+            )
+            yield from table_chunks
+            continue
+
         context_prefix = _resolve_context_prefix(leading, previous_unit, full_text)
         reserved = len(context_prefix) + 1 if context_prefix else 0
         budget = max(max_chunk_size - reserved, leading.end - leading.start)

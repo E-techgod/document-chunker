@@ -7,7 +7,7 @@ from src.document_chunker.loader import PDFLoadError, load_pdf
 from src.document_chunker.schemas import PDFDocumentInput
 from src.document_chunker.normalizer import normalize_document, normalize_text
 from src.document_chunker.counting import count_words
-from src.document_chunker.chunker import chunk_document, ChunkingConfig
+from src.document_chunker.chunker import chunk_document
 from src.document_chunker.evaluator import validate_chunks
 from src.document_chunker.chunking_strategies import get_chunking_strategy, describe_chunking
 ACTIVE_CHUNKING_STRATEGY = "v2.2" # v1.0: character chunking with overlap, v2.1: structural chunking with no context carry, v2.2: structural chunking with context carry
