@@ -133,13 +133,14 @@ Defaults to `data/sample.pdf` with no password if no arguments are given. It wal
 Chunking runs against `normalized_text`, not the structured blocks — the point is to have a baseline that later strategies (structure-aware, semantic, etc.) can be measured against on the exact same normalized input. Metrics below are computed on `data/sample.pdf` with `ChunkingConfig(max_chunk_size=1000, overlap_size=100)`, the default `main.py` runs.
 
 - **Chunk size / Overlap / Stride** — the configured `max_chunk_size` / `overlap_size`, and the derived step between chunk starts (`stride = chunk_size - overlap`).
-- **Total chunk characters** — sum of every chunk's `char_count` (`ChunkingResult.total_char_count`). Overlapping regions get counted once per chunk that contains them, so this is normally >= source characters.
-- **Duplicate characters** — `total_chunk_characters − source_characters`: the excess from characters that appear in more than one chunk because of overlap.
+- **Total chunk characters** — sum of every chunk's `char_count` (`ChunkingResult.total_char_count`). Overlapping regions get counted once per chunk that contains them, so this is normally >= source characters for overlap-based chunking, but can be slightly lower for structural chunking if boundary-only whitespace is omitted.
+- **Duplicate characters** — `total_chunk_characters − source_characters`: the excess from characters that appear in more than one chunk because of overlap. Structural chunking can make this negative when it drops boundary-only whitespace instead of duplicating it.
 - **Duplicate overhead %** — `duplicate_characters / source_characters × 100`: how much extra text (and therefore extra embeddings/storage) the overlap costs relative to the source.
 
 | Strategy | Source chars | Chunks | Chunk size | Overlap | Stride | Total chunk chars | Duplicate chars | Duplicate overhead % |
 |---|---|---|---|---|---|---|---|---|
 | Character (fixed-size, overlap) (max_chunks_size=1000, overlap_size (step_size)=100)| 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
+| Structural v2.1 (no context carry) | 7,576 | 8 | 1000 | 0 | 1000 | 7,567 | -9 | -0.12% |
 
 ## Tests
 
