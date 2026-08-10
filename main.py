@@ -10,7 +10,7 @@ from src.document_chunker.counting import count_words
 from src.document_chunker.chunker import chunk_document, ChunkingConfig
 from src.document_chunker.evaluator import validate_chunks
 CHUNKING_STRATEGY = "structural"  # characters | structural
-V2_CARRY_CONTEXT = True # structural only, TRUE to activate (v2.2); FALSE ignored for "characters" 
+V2_CARRY_CONTEXT = False # structural only, TRUE to activate (v2.2); FALSE ignored for "characters" 
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
