@@ -28,6 +28,9 @@ _SENTENCE_TERMINAL_RE = re.compile(r'[.!?]["\')\]]?$')
 _WRAP_CONTINUATION_END_RE = re.compile(r"(?:,|[&/\-–—]|(?:\b(?:and|or|but|nor|yet|so|for)\b))$", re.IGNORECASE)
 _PIPE_SPLIT_TABLE_RE = re.compile(r"\s*\|\s*")
 _WHITESPACE_SPLIT_TABLE_RE = re.compile(r"\s{2,}")
+# A numbered section label followed by more title text, e.g. "Week 4: Git, GitHub & APIs"
+# or "Chapter 3: Introduction" — unlike a bare trailing colon, the colon sits mid-line.
+_NUMBERED_LABEL_HEADING_RE = re.compile(r"^[A-Z][A-Za-z]*\s+[0-9]+[A-Za-z]*\s*:\s+\S")
 
 DEFAULT_NORMALIZATION_STRATEGY: NormalizationStrategy = "structural"
 
@@ -142,6 +145,12 @@ def _is_heading_like(text: str) -> bool:
     if _LIST_ITEM_RE.match(stripped):
         return False
     if len(stripped) <= 90 and stripped.endswith(":"):
+        return True
+    if (
+        len(stripped) <= 90
+        and _NUMBERED_LABEL_HEADING_RE.match(stripped)
+        and not _SENTENCE_TERMINAL_RE.search(stripped)
+    ):
         return True
 
     words = stripped.split()

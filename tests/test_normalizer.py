@@ -182,6 +182,24 @@ def test_does_not_promote_title_cased_clause_to_heading() -> None:
     assert normalize_text(text) == expected
 
 
+def test_numbered_section_label_is_classified_as_heading():
+    page = ExtractedPage(page_number=1, text="Week 4: Git, GitHub & APIs\n\n- Master Git basics")
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "heading"
+    assert normalized.blocks[0].text == "Week 4: Git, GitHub & APIs"
+
+
+def test_numbered_label_sentence_is_not_misclassified_as_heading():
+    # Structurally matches "Label N: ..." but ends the line as a full sentence, not a
+    # title — the numbered-label heading rule requires no sentence terminator.
+    text = "Day 3: the team finally shipped the feature to production."
+    page = ExtractedPage(page_number=1, text=text)
+    normalized = normalize_page(page)
+
+    assert normalized.blocks[0].block_type == "paragraph"
+
+
 def test_does_not_join_short_standalone_line_with_title_cased_following_line() -> None:
     text = "Overview\nImplementation Notes"
     expected = "Overview\n\nImplementation Notes"

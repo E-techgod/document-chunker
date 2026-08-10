@@ -237,3 +237,122 @@ def test_structural_strategy_produces_no_overlap_between_chunks(make_extract_doc
 
     for earlier, later in zip(result.chunks, result.chunks[1:]):
         assert later.start_char >= earlier.end_char
+
+
+# --- structural context propagation (v2.2) ---
+
+
+def test_context_disabled_by_default_reproduces_v21_output(make_extract_document):
+    text = "WEEK 4 OVERVIEW\n\n- Master Git basics\n- Call public REST APIs\n- Push to GitHub\n"
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(max_chunk_size=50, overlap_size=0, chunking_strategy="structural")
+
+    with_flag_off = chunk_document(document, config)
+    without_flag = chunk_document(document, config.model_copy(update={"propagate_context": False}))
+
+    assert [(c.start_char, c.end_char, c.text) for c in with_flag_off.chunks] == [
+        (c.start_char, c.end_char, c.text) for c in without_flag.chunks
+    ]
+    assert all(c.context_prefix == "" for c in with_flag_off.chunks)
+
+
+def test_orphaned_chunk_gets_governing_heading_prepended(make_extract_document):
+    text = (
+        "WEEK 4 OVERVIEW\n\n"
+        "- Master Git basics\n"
+        "- Call public REST APIs\n"
+        "- Push your first project to GitHub\n"
+        "- Build: Weather CLI app using a public API\n"
+    )
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(max_chunk_size=67, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    assert result.chunks[0].context_prefix == ""
+    assert result.chunks[0].text.startswith("WEEK 4 OVERVIEW")
+    assert result.chunks[1].context_prefix == "WEEK 4 OVERVIEW"
+    assert "WEEK 4 OVERVIEW" not in result.chunks[1].text
+
+
+def test_chunk_opening_on_its_own_heading_gets_no_prefix(make_extract_document):
+    text = "WEEK 4 OVERVIEW\n\n- item one\n\nWEEK 9 OVERVIEW\n\n- item two\n"
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(max_chunk_size=16, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    heading_chunks = [c for c in result.chunks if c.text.startswith("WEEK")]
+    assert heading_chunks
+    assert all(c.context_prefix == "" for c in heading_chunks)
+
+
+def test_table_continuation_gets_heading_and_header_row_prepended(make_extract_document):
+    text = (
+        "TABLE OVERVIEW\n\n"
+        "Name | Role | Score\n"
+        "Alice | Engineer | 90\n"
+        "Bob | Manager | 85\n"
+    )
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(max_chunk_size=55, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    continuation_chunks = [c for c in result.chunks if c.text.startswith("Alice") or c.text.startswith("Bob")]
+    assert continuation_chunks
+    for chunk in continuation_chunks:
+        assert chunk.context_prefix == "TABLE OVERVIEW\nName | Role | Score"
+        # The header row is never redundantly repeated inside its own chunk.
+        assert chunk.text.count("Name | Role | Score") == 0
+
+
+def test_no_heading_falls_back_to_previous_units_text(make_extract_document):
+    text = "- alpha item\n- beta item\n- gamma item\n"
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(max_chunk_size=15, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    assert result.chunks[0].context_prefix == ""
+    for earlier, later in zip(result.chunks, result.chunks[1:]):
+        assert later.context_prefix == earlier.text
+
+
+def test_contextualized_text_combines_prefix_and_text(make_extract_document):
+    text = "WEEK 4 OVERVIEW\n\n- item one\n- item two\n"
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(max_chunk_size=30, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+
+    result = chunk_document(document, config)
+
+    for chunk in result.chunks:
+        if chunk.context_prefix:
+            assert chunk.contextualized_text == f"{chunk.context_prefix}\n{chunk.text}"
+        else:
+            assert chunk.contextualized_text == chunk.text
+
+
+def test_context_prefix_counts_against_max_chunk_size_budget(make_extract_document):
+    text = (
+        "WEEK 4 OVERVIEW\n\n"
+        "- Master Git basics\n"
+        "- Call public REST APIs\n"
+        "- Push your first project to GitHub\n"
+        "- Build: Weather CLI app using a public API\n"
+    )
+    document = _normalized(make_extract_document, [text])
+    max_chunk_size = 67
+    config = ChunkingConfig(
+        max_chunk_size=max_chunk_size, overlap_size=0, chunking_strategy="structural", propagate_context=True
+    )
+
+    result = chunk_document(document, config)
+
+    for chunk in result.chunks:
+        own_size = chunk.end_char - chunk.start_char
+        reserved = len(chunk.context_prefix) + 1 if chunk.context_prefix else 0
+        # Own content is packed to fit within the reduced budget (no unit in this
+        # text is individually oversized, so the single-oversized-unit exception
+        # never kicks in here).
+        assert own_size <= max_chunk_size - reserved

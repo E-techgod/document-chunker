@@ -125,6 +125,7 @@ class ChunkingConfig(BaseModel): # The rules: How to chunk the document into sma
     max_chunk_size: int = Field(default=1000, ge=1)
     overlap_size: int = Field(default=100, ge=0)
     chunking_strategy: Literal["characters", "structural"] = "characters"
+    propagate_context: bool = True  # structural only (v2.2); ignored for "characters"
 
 class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represents a chunk of a document, with metadata and content
     document_id: str
@@ -136,6 +137,12 @@ class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represen
     page_numbers: list[int] = Field(default_factory=list)
     word_count: int = Field(default=0, ge=0)
     char_count: int = Field(default=0, ge=0)
+    context_prefix: str = ""
+
+    @computed_field
+    @property
+    def contextualized_text(self) -> str:
+        return f"{self.context_prefix}\n{self.text}" if self.context_prefix else self.text
 
     @field_validator("word_count", "char_count", mode="before")
     @classmethod
