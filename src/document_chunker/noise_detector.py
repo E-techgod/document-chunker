@@ -18,6 +18,7 @@ _PAGE_NUMBER_RE = re.compile(
 _DASHED_PAGE_NUMBER_RE = re.compile(r"^[-–—]\s*\d{1,4}\s*[-–—]$")
 _ROMAN_NUMERAL_RE = re.compile(r"^[ivxlcdm]{1,6}$", re.IGNORECASE)
 _DIGIT_RUN_RE = re.compile(r"\d+")
+_WHITESPACE_RUN_RE = re.compile(r"\s+")
 
 DEFAULT_ZONE_SIZE = 2
 DEFAULT_MIN_REPEAT_COUNT = 3
@@ -36,8 +37,14 @@ def _is_page_number_line(text: str) -> bool:
 
 def _normalize_for_repetition(text: str) -> str:
     """Collapse digit runs so 'Page 3' and 'Page 47' - or a copyright line with a
-    changing year - count as the same recurring line."""
-    return _DIGIT_RUN_RE.sub("#", text.strip().lower())
+    changing year - count as the same recurring line. Also collapses internal
+    whitespace runs: layout-mode PDF extraction right-pads/aligns a footer against
+    other text on the same line with variable-width gaps per page (e.g.
+    'Brand<32 spaces>Page 2' vs 'Brand<45 spaces>Page 3'), which would otherwise make
+    every page's footer normalize to a distinct string and never reach the repetition
+    threshold."""
+    normalized = _DIGIT_RUN_RE.sub("#", text.strip().lower())
+    return _WHITESPACE_RUN_RE.sub(" ", normalized)
 
 
 def _zone_lines(lines: list[str], zone_size: int) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:

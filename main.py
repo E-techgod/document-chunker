@@ -5,7 +5,10 @@ from pydantic import ValidationError
 from src.document_chunker.extractor import PDFExtractionError, extract_pdf
 from src.document_chunker.loader import PDFLoadError, load_pdf
 from src.document_chunker.schemas import PDFDocumentInput
-from src.document_chunker.normalizer import normalize_document, normalize_text
+from src.document_chunker.normalizer import normalize_text
+from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.step2_pipeline import validate_structured_document
+from src.document_chunker.structured_bridge import to_normalized_document
 from src.document_chunker.counting import count_words
 from src.document_chunker.chunker import chunk_document
 from src.document_chunker.evaluator import validate_chunks
@@ -48,7 +51,27 @@ def main() -> None:
     print(f"Total words: {extracted.word_count}")
     print(f"Total chars: {extracted.char_count}\n")"""
 
-    normalized = normalize_document(extracted)
+    structured = build_structured_document(extracted)
+    step2_issues = validate_structured_document(structured, source=extracted)
+    if step2_issues:
+        # Non-fatal: a pre-existing, documented Step 2 limitation (pipe-separated prose
+        # can misdetect as a table on some PDFs - see
+        # test_known_limitation_pipe_separated_labels_can_misdetect_as_a_table) can trip
+        # the lossless-content invariant without indicating an actual noise-detection or
+        # bridging bug. Surfaced as a warning rather than aborting the run.
+        print(f"Step 2 structured normalization warnings: {len(step2_issues)} issue(s) found.")
+        for issue in step2_issues:
+            print(f"  {issue}")
+
+    noise_blocks = [b for b in structured.blocks if b.is_noise]
+    print(
+        f"Noise detection: {len(noise_blocks)} block(s) excluded from chunking "
+        "(page headers/footers)."
+    )
+    if noise_blocks:
+        print(f"  e.g. {sorted({b.text for b in noise_blocks})[:5]}")
+
+    normalized = to_normalized_document(extracted, structured)
 
     """print("Normalization complete: Text cleaned and normalized.")
     #print(f"Full text normalized: \n{normalized.full_text}\n") 
@@ -88,14 +111,10 @@ def main() -> None:
             print(f"[context]\n{chunk.context_prefix}")
         print(f"[content]\n{chunk.text}\n")
 
-    print("Chunk 7: ")
-    print(f"[content]\n{chunker.chunks[7].text}\n")
-    print("Chunk 17: ")
-    print(f"[content]\n{chunker.chunks[17].text}\n")
-    print("Chunk 24: ")
-    print(f"[content]\n{chunker.chunks[24].text}\n")
-    print("Chunk 38: ")
-    print(f"[content]\n{chunker.chunks[38].text}\n")
+    for debug_index in (7, 17, 24, 38):
+        if debug_index < len(chunker.chunks):
+            print(f"Chunk {debug_index}: ")
+            print(f"[content]\n{chunker.chunks[debug_index].text}\n")
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:

@@ -75,6 +75,21 @@ def test_repeated_footer_text_across_pages_is_detected():
     assert result == [{3: "page_footer"}] * 3
 
 
+def test_repeated_footer_with_variable_internal_padding_is_still_detected():
+    # Layout-mode PDF extraction right-aligns "Brand ... Page N" on one line with a
+    # gap width that depends on the page's other content - the visual column padding
+    # differs per page even though the footer is logically identical.
+    pages = [
+        ["Body one.", "Acme Corp" + " " * 30 + "Page 1"],
+        ["Body two.", "Acme Corp" + " " * 45 + "Page 2"],
+        ["Body three.", "Acme Corp" + " " * 12 + "Page 3"],
+    ]
+
+    result = detect_noise_lines(pages)
+
+    assert all(page_result == {1: "page_footer"} for page_result in result)
+
+
 def test_repeated_footer_with_changing_year_is_still_detected():
     pages = [
         ["Header one", "Header sub one", "Body one.", "© 2021 Acme Corp"],
