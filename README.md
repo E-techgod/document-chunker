@@ -21,9 +21,73 @@ The generated graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`
 - `22` communities
 - no import cycles detected
 
-Its highest-connectivity nodes are centered on `build_structured_document()`, `chunk_document()`, `validate_chunks()`, `normalize_page()`, and `extract_pdf()`, which matches the codebase's real center of gravity: normalization, chunking, validation, and their surrounding schemas/tests.
+```mermaid
+flowchart LR
+  main["main.py"]
+  data["data/ PDFs"]
+  graphify["graphify-out/
+  GRAPH_REPORT.md
+  graph.json
+  graph.html"]
+  tests["tests/
+  stage + structure + validation suites"]
 
-The graph also shows the project has grown beyond the earlier linear "load/extract/normalize only" shape. In addition to the baseline pipeline, it now includes structural parsing helpers, table normalization/parsing, heading and list detection, chunking strategy selection, and validation-focused test communities.
+  subgraph core["src/document_chunker"]
+    schemas["schemas.py
+    shared models + computed counts"]
+    loader["loader.py
+    PDF loading"]
+    extractor["extractor.py
+    text extraction"]
+    normalizer["normalizer.py
+    document normalization"]
+    chunker["chunker.py
+    chunk generation"]
+    evaluator["evaluator.py
+    chunk validation"]
+    strategies["chunking_strategies.py
+    strategy selection"]
+  end
+
+  subgraph structure["Structured normalization helpers"]
+    heading["heading_detector.py"]
+    listd["list_detector.py"]
+    paragraph["paragraph_normalizer.py"]
+    table_norm["table_normalizer.py"]
+    table_parse["table_parser.py"]
+    structured["structured_models.py"]
+    step2["step2_pipeline.py"]
+  end
+
+  data --> main
+  main --> loader
+  main --> extractor
+  main --> normalizer
+  main --> chunker
+  main --> evaluator
+  main --> strategies
+
+  loader --> schemas
+  extractor --> schemas
+  normalizer --> schemas
+  chunker --> schemas
+  evaluator --> schemas
+  strategies --> schemas
+
+  normalizer --> heading
+  normalizer --> listd
+  normalizer --> paragraph
+  normalizer --> table_norm
+  normalizer --> table_parse
+  step2 --> structured
+
+  tests --> core
+  tests --> structure
+  graphify -. maps repo relationships .-> core
+  graphify -. summarizes test and module communities .-> tests
+```
+
+The graph's highest-connectivity nodes are centered on `build_structured_document()`, `chunk_document()`, `validate_chunks()`, `normalize_page()`, and `extract_pdf()`, which matches the codebase's real center of gravity: normalization, chunking, validation, and their surrounding schemas/tests.
 
 ## Pipeline
 
