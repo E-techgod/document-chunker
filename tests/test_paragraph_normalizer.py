@@ -2,7 +2,7 @@ import re
 
 from document_chunker.paragraph_normalizer import build_structured_document
 from document_chunker.schemas import ExtractedDocument, ExtractedPage
-from document_chunker.structured_models import ParagraphBlock
+from document_chunker.structured_models import HeadingBlock, ParagraphBlock
 
 
 def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:
@@ -139,6 +139,85 @@ def test_block_ids_are_unique_and_sequential():
     structured = build_structured_document(document)
 
     assert [b.block_id for b in structured.blocks] == ["block_001", "block_002", "block_003"]
+
+
+# --- heading detection and interleaving (Phase 3) ---
+
+
+def test_heading_and_paragraphs_interleave_in_document_order():
+    document = _document(
+        [
+            "CHAPTER 01\n\nThis is the opening paragraph of the chapter.\n\nWeek 5: Git & APIs\n\nMore prose here."
+        ]
+    )
+
+    structured = build_structured_document(document)
+
+    assert [type(b).__name__ for b in structured.blocks] == [
+        "HeadingBlock",
+        "ParagraphBlock",
+        "HeadingBlock",
+        "ParagraphBlock",
+    ]
+    assert [b.text for b in structured.blocks] == [
+        "CHAPTER 01",
+        "This is the opening paragraph of the chapter.",
+        "Week 5: Git & APIs",
+        "More prose here.",
+    ]
+    assert structured.blocks[0].level == 1
+    assert structured.blocks[2].level == 1
+
+
+def test_heading_false_positive_stays_a_paragraph_block():
+    document = _document(
+        ["CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND\n\nOver 75% of AI job listings seek domain experts."]
+    )
+
+    structured = build_structured_document(document)
+
+    assert isinstance(structured.blocks[0], ParagraphBlock)
+    assert structured.blocks[0].text == "CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND"
+
+
+def test_wrapped_multi_line_chunk_with_numbered_prefix_stays_a_paragraph_not_a_heading():
+    # Layout signal: a heading candidate must be a single standalone line. A numbered
+    # prefix that wraps across two physical lines is ordinary paragraph content.
+    document = _document(["Week 2 was really hard for\nmost students in the cohort."])
+
+    structured = build_structured_document(document)
+
+    assert isinstance(structured.blocks[0], ParagraphBlock)
+    assert structured.blocks[0].text == "Week 2 was really hard for most students in the cohort."
+
+
+def test_span_invariant_holds_across_interleaved_heading_and_paragraph_blocks():
+    document = _document(
+        [
+            "CHAPTER 01\n\nOpening paragraph text.\n\nSTEP 3\n\nAnother paragraph here.",
+            "Section 4.1\n\nFinal paragraph on page two.",
+        ]
+    )
+
+    structured = build_structured_document(document)
+
+    assert any(isinstance(b, HeadingBlock) for b in structured.blocks)
+    assert structured.validate_spans() == []
+    structured.assert_spans_valid()
+
+
+def test_monotonic_span_ordering_across_interleaved_heading_and_paragraph_blocks():
+    document = _document(
+        [
+            "CHAPTER 01\n\nOpening paragraph text.\n\nSTEP 3\n\nAnother paragraph here.",
+            "Section 4.1\n\nFinal paragraph on page two.",
+        ]
+    )
+
+    structured = build_structured_document(document)
+
+    for previous, current in zip(structured.blocks, structured.blocks[1:]):
+        assert current.start_char >= previous.end_char
 
 
 # --- content preservation ---
