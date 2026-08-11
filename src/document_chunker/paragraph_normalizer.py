@@ -10,30 +10,35 @@ from document_chunker.structured_models import (
     ListBlock,
     ParagraphBlock,
     StructuredNormalizedDocument,
+    TableBlock,
 )
+from document_chunker.table_parser import is_table_row_candidate, parse_table_region
 
-# Phase 2/3/4 of the Step 2 "Normalize + Preserve Structure" redesign: paragraph,
-# heading, and list reconstruction with baseline span calculation, built on Phase 1's
-# structured_models. This is a separate, parallel pipeline from normalizer.py's existing
-# normalize_page/normalize_document - it is not wired into chunker.py and does not touch
-# the existing NormalizedDocument/NormalizedBlock (schemas.py) that pipeline depends on.
+# Phase 2/3/4/5 of the Step 2 "Normalize + Preserve Structure" redesign: paragraph,
+# heading, list, and table reconstruction with baseline span calculation, built on
+# Phase 1's structured_models. This is a separate, parallel pipeline from normalizer.py's
+# existing normalize_page/normalize_document - it is not wired into chunker.py and does
+# not touch the existing NormalizedDocument/NormalizedBlock (schemas.py) that pipeline
+# depends on.
 #
-# Table detection is still out of scope: every non-blank, non-heading, non-list-item
-# line accumulates into a ParagraphBlock. A vertical-gap (Delta-Y) paragraph-boundary
-# signal is part of the Step 2 design but has no implementation here, because the
-# current Extractor (kept unchanged per the Phase 1 scoping decision) only provides
-# plain per-page text - no spatial/coordinate metadata to compute a gap from.
+# A vertical-gap (Delta-Y) paragraph-boundary signal is part of the Step 2 design but has
+# no implementation here, because the current Extractor (kept unchanged per the Phase 1
+# scoping decision) only provides plain per-page text - no spatial/coordinate metadata to
+# compute a gap from.
 #
-# Heading and list detection both run line-by-line during the same single pass that
-# splits paragraphs, rather than only after chunking on blank lines: real single-column
-# PDF extraction (verified against this repo's own sample PDFs) rarely inserts a blank
-# line between a heading/list and the body text around it, so they almost never end up
-# as their own blank-line-bounded chunk on their own. A detected heading or list-item
-# marker closes out whatever paragraph was accumulating; a blank line, a heading, or a
-# non-continuation line all close out a list in progress (see list_detector for the
-# continuation-vs-new-paragraph distinction).
+# Heading, list, and table detection all run line-by-line during the same single pass
+# that splits paragraphs, rather than only after chunking on blank lines: real
+# single-column PDF extraction (verified against this repo's own sample PDFs) rarely
+# inserts a blank line between a heading/list/table and the body text around it, so they
+# almost never end up as their own blank-line-bounded chunk on their own. A detected
+# heading, list-item marker, or table-row candidate closes out whatever paragraph was
+# accumulating; a blank line, a heading, a table, or a non-continuation line all close
+# out a list in progress (see list_detector for the continuation-vs-new-paragraph
+# distinction). Table row/cell reconstruction itself is delegated to table_parser.py,
+# which reuses table_normalizer.TableNormalizer - the same position-based algorithm
+# already proven against this repo's own real-world PDF tables for the older pipeline.
 
-_BlockKind = Literal["heading", "paragraph", "list"]
+_BlockKind = Literal["heading", "paragraph", "list", "table"]
 
 
 @dataclass(frozen=True)
@@ -42,6 +47,8 @@ class _BlockEntry:
     text: str
     level: int | None = None
     items: list[str] = field(default_factory=list)
+    columns: list[str] = field(default_factory=list)
+    rows: list[list[str]] = field(default_factory=list)
 
 
 def _join_wrapped_lines(lines: list[str]) -> str:
@@ -80,12 +87,16 @@ def _split_into_blocks(preprocessed_text: str) -> list[_BlockEntry]:
             entries.append(_BlockEntry(kind="list", text="\n".join(completed_items), items=list(completed_items)))
         completed_items.clear()
 
-    for raw_line in preprocessed_text.split("\n"):
+    lines = preprocessed_text.split("\n")
+    index = 0
+    while index < len(lines):
+        raw_line = lines[index]
         line = raw_line.strip()
 
         if not line:
             flush_paragraph()
             flush_list()
+            index += 1
             continue
 
         item_text = match_list_item(line)
@@ -94,6 +105,7 @@ def _split_into_blocks(preprocessed_text: str) -> list[_BlockEntry]:
             flush_current_item()
             item_lines.append(item_text)
             item_marker_indent = _measure_indent(raw_line)
+            index += 1
             continue
 
         level = detect_heading_level(line)
@@ -101,14 +113,27 @@ def _split_into_blocks(preprocessed_text: str) -> list[_BlockEntry]:
             flush_paragraph()
             flush_list()
             entries.append(_BlockEntry(kind="heading", text=line, level=level))
+            index += 1
             continue
+
+        if is_table_row_candidate(line):
+            table, next_index = parse_table_region(lines, index)
+            if table is not None:
+                flush_paragraph()
+                flush_list()
+                columns, rows, text = table
+                entries.append(_BlockEntry(kind="table", text=text, columns=columns, rows=rows))
+                index = next_index
+                continue
 
         if item_lines and is_continuation_line(raw_line, item_marker_indent):
             item_lines.append(line)
+            index += 1
             continue
 
         flush_list()
         paragraph_lines.append(raw_line)
+        index += 1
 
     flush_paragraph()
     flush_list()
@@ -116,11 +141,12 @@ def _split_into_blocks(preprocessed_text: str) -> list[_BlockEntry]:
 
 
 def build_structured_document(document: ExtractedDocument) -> StructuredNormalizedDocument:
-    """Reconstruct HeadingBlocks, ParagraphBlocks, and ListBlocks from raw per-page
-    extractor text and assemble the canonical full_text, interleaved in document order.
-    A page boundary always starts a new block - text is never joined across two pages,
-    even mid-sentence or mid-list, since page is a per-block field on NormalizedBlock
-    (Phase 1) that would otherwise be ambiguous for a merged block.
+    """Reconstruct HeadingBlocks, ParagraphBlocks, ListBlocks, and TableBlocks from raw
+    per-page extractor text and assemble the canonical full_text, interleaved in
+    document order. A page boundary always starts a new block - text is never joined
+    across two pages, even mid-sentence, mid-list, or mid-table, since page is a
+    per-block field on NormalizedBlock (Phase 1) that would otherwise be ambiguous for a
+    merged block.
 
     Spans are computed strictly after block text assembly: every block's final text is
     decided first, full_text is rendered by joining them with "\\n\\n", and only then are
@@ -136,7 +162,7 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
 
     full_text = "\n\n".join(entry.text for _, entry in entries)
 
-    blocks: list[HeadingBlock | ParagraphBlock | ListBlock] = []
+    blocks: list[HeadingBlock | ParagraphBlock | ListBlock | TableBlock] = []
     cursor = 0
     for index, (page_number, entry) in enumerate(entries):
         start = cursor
@@ -152,6 +178,18 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
             blocks.append(
                 ListBlock(
                     block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end, items=entry.items
+                )
+            )
+        elif entry.kind == "table":
+            blocks.append(
+                TableBlock(
+                    block_id=block_id,
+                    text=entry.text,
+                    page=page_number,
+                    start_char=start,
+                    end_char=end,
+                    columns=entry.columns,
+                    rows=entry.rows,
                 )
             )
         else:

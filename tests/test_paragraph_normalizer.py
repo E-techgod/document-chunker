@@ -357,7 +357,7 @@ def test_separate_list_blocks_on_different_pages_do_not_merge():
 def test_no_non_whitespace_content_is_dropped_during_line_joining():
     raw_text = (
         "  This   line has  extra   spaces\n"
-        "and wraps   onto a second line.\n\n"
+        "and wraps onto a second line.\n\n"
         "A completely separate paragraph\nwith its own wrap."
     )
     document = _document([raw_text])

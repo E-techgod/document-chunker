@@ -51,21 +51,44 @@ def _nearest_column(offset: int, column_starts: list[int]) -> int:
     return min(range(len(column_starts)), key=lambda i: abs(column_starts[i] - offset))
 
 
+def _assign_columns_in_order(segments: list[tuple[int, str]], column_starts: list[int]) -> list[int]:
+    """Column index for each of `segments`, in order, each strictly after the last -
+    unlike independent nearest-column matching per segment, this never assigns two
+    segments to the same or an earlier column than the one before it. Needed because a
+    short first cell (e.g. a single-digit row label) can leave the second column's text
+    starting well left of where the header's own second column begins, which would
+    otherwise make plain nearest-distance matching misassign it back to column 0."""
+    assigned = []
+    floor = 0
+    for offset, _ in segments:
+        candidates = range(floor, len(column_starts))
+        best = min(candidates, key=lambda i: abs(column_starts[i] - offset)) if candidates else floor
+        assigned.append(best)
+        floor = min(best + 1, len(column_starts) - 1)
+    return assigned
+
+
 class TableNormalizer:
     """Reconstructs logical table rows from physical text lines.
 
     A physical line is not necessarily a table row: layout-mode PDF extraction wraps an
     over-width cell onto its own line, indented to align with the column it belongs to
     rather than the row's first column. That character-offset alignment (established from
-    the header row) is the primary signal used here to tell a genuine new row (a segment
-    lands at column 0's position) apart from a wrapped continuation (it doesn't) - falling
-    back to the existing content-shape heuristics (_parse_table_row's token-count fallback,
-    _looks_like_table_continuation's lookahead/trailing-signal check) only when position
-    data is inconclusive, e.g. a short trailing fragment that happens to sit at column 0's
-    offset. Known limitation: a wrapped column-0 value whose continuation line also carries
-    a later column's wrapped text (so it still looks like >=2 populated cells) is read as a
-    new row rather than a continuation - there is no reliable signal to distinguish the two
-    from a single line alone.
+    the header row) is the primary signal used here to tell a genuine new row apart from
+    a wrapped continuation - falling back to the existing content-shape heuristics
+    (_parse_table_row's token-count fallback, _looks_like_table_continuation's
+    lookahead/trailing-signal check) only when position data is inconclusive, e.g. a
+    short trailing fragment that happens to sit at column 0's offset.
+
+    A segment landing at column 0's position is necessary but not sufficient evidence of
+    a new row: a continuation line can wrap column 0's own value while also carrying a
+    later column's wrapped text on the same physical line (e.g. "Mid-Level (3-5" wraps to
+    "yrs)" in column 0, while "Sweet spot - highest volume of" simultaneously wraps to
+    "openings" in the last column, on that same continuation line) - column 0 alone would
+    misread that as a new row. A multi-segment line therefore also requires a segment at
+    column 1 to count as a new row; a single ambiguous fragment at column 0 still falls
+    back to the content-shape heuristics above, since there's nothing positional left to
+    check it against.
     """
 
     def detect_header(self, lines: list[ClassifiedLine], start_index: int) -> list[str]:
@@ -99,19 +122,35 @@ class TableNormalizer:
     ) -> tuple[list[list[str]], int]:
         """Walk the table's physical lines, merging wrapped cell lines into the row
         currently open and emitting a complete logical row each time a line shows evidence
-        of a new first-column value (a segment positioned at column 0)."""
+        of a new first-column value (a segment positioned at column 0, plus - when the
+        line has more than one segment - another at column 1; see the class docstring).
+
+        The column-start reference updates to each newly-accepted row's own segment
+        offsets (when it was cleanly gap-split, so those offsets are trustworthy),
+        rather than staying fixed at the header's. A header is often padded/centered
+        differently than its data rows (e.g. indented further), so matching a data row's
+        own continuation lines against the header's column positions can land right on a
+        boundary between two columns - matching against that row's own positions instead
+        is what a wrapped line actually visually aligns to.
+        """
         expected_columns = len(header_values)
         rows: list[list[str]] = [header_values]
         row_index = start_index + 1
+        active_column_starts = column_starts
 
         while row_index < end_index:
             line = lines[row_index]
+            segments = _segment_positions(line.raw_text)
+            assigned_columns = _assign_columns_in_order(segments, active_column_starts)
+            skips_column_one = len(segments) >= 2 and len(active_column_starts) >= 2 and 1 not in assigned_columns
 
-            if _nearest_column(line.indent, column_starts) == 0:
+            if _nearest_column(line.indent, active_column_starts) == 0 and not skips_column_one:
                 row = _parse_table_row(line, expected_columns=expected_columns)
                 if len(row) >= 2:
                     rows.append(row)
                     row_index += 1
+                    if len(segments) == len(row):
+                        active_column_starts = [offset for offset, _ in segments]
                     continue
 
                 if len(rows) >= 2 and _looks_like_table_continuation(
@@ -126,12 +165,14 @@ class TableNormalizer:
                     continue
                 break
 
-            # Positionally not at column 0: this line cannot be a new row's first cell,
-            # so it can only be a wrapped continuation of the row already in progress -
-            # its segments' offsets reliably indicate which column(s) they continue.
+            # Not confidently a new row - either positionally off column 0 entirely, or
+            # a multi-segment line whose column 0 wrap skips straight to a later column
+            # without touching column 1 - so it can only be a wrapped continuation of the
+            # row already in progress; its segments' offsets reliably indicate which
+            # column(s) they continue.
             if len(rows) < 2:
                 break
-            self._merge_by_position(rows[-1], line, column_starts)
+            self._merge_by_position(rows[-1], line, active_column_starts)
             row_index += 1
 
         return rows, row_index
