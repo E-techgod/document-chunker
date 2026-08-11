@@ -2,7 +2,7 @@ import re
 
 from document_chunker.paragraph_normalizer import build_structured_document
 from document_chunker.schemas import ExtractedDocument, ExtractedPage
-from document_chunker.structured_models import HeadingBlock, ParagraphBlock
+from document_chunker.structured_models import HeadingBlock, ListBlock, ParagraphBlock
 
 
 def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:
@@ -218,6 +218,137 @@ def test_monotonic_span_ordering_across_interleaved_heading_and_paragraph_blocks
 
     for previous, current in zip(structured.blocks, structured.blocks[1:]):
         assert current.start_char >= previous.end_char
+
+
+# --- list detection and grouping (Phase 4) ---
+
+
+def test_consecutive_bullet_items_group_into_one_list_block():
+    document = _document(
+        [
+            "● Learn functions, arguments, return values, scope\n"
+            "● Work with lists, dictionaries, tuples, and sets\n"
+            "● Start writing cleaner, reusable code"
+        ]
+    )
+
+    structured = build_structured_document(document)
+
+    assert len(structured.blocks) == 1
+    block = structured.blocks[0]
+    assert isinstance(block, ListBlock)
+    assert block.items == [
+        "Learn functions, arguments, return values, scope",
+        "Work with lists, dictionaries, tuples, and sets",
+        "Start writing cleaner, reusable code",
+    ]
+
+
+def test_list_block_text_renders_items_joined_by_newline():
+    document = _document(["- First item\n- Second item\n- Third item"])
+
+    structured = build_structured_document(document)
+
+    assert structured.blocks[0].text == "First item\nSecond item\nThird item"
+
+
+def test_multi_line_wrapped_bullet_merges_into_one_item():
+    document = _document(
+        [
+            "    ● Master Git basics: commit, branch, merge, push\n"
+            "    ● Call public REST APIs using\n"
+            "      requests and other tools\n"
+            "    ● Push your first project to GitHub"
+        ]
+    )
+
+    structured = build_structured_document(document)
+
+    block = structured.blocks[0]
+    assert isinstance(block, ListBlock)
+    assert block.items == [
+        "Master Git basics: commit, branch, merge, push",
+        "Call public REST APIs using requests and other tools",
+        "Push your first project to GitHub",
+    ]
+
+
+def test_list_terminates_on_blank_line_before_a_paragraph():
+    document = _document(["- First item\n- Second item\n\nA normal paragraph follows."])
+
+    structured = build_structured_document(document)
+
+    assert [type(b).__name__ for b in structured.blocks] == ["ListBlock", "ParagraphBlock"]
+    assert structured.blocks[0].items == ["First item", "Second item"]
+    assert structured.blocks[1].text == "A normal paragraph follows."
+
+
+def test_list_terminates_on_a_new_heading():
+    document = _document(["- First item\n- Second item\nSTEP 3\n- Third item\n- Fourth item"])
+
+    structured = build_structured_document(document)
+
+    assert [type(b).__name__ for b in structured.blocks] == ["ListBlock", "HeadingBlock", "ListBlock"]
+    assert structured.blocks[0].items == ["First item", "Second item"]
+    assert structured.blocks[2].items == ["Third item", "Fourth item"]
+
+
+def test_list_terminates_on_a_non_continuation_paragraph_line_without_a_blank_line():
+    # A plain line with no marker and no deeper indent than the last item's marker ends
+    # the list and starts a paragraph, even without a blank line in between.
+    document = _document(["    - First item\n    - Second item\nA paragraph starts right here."])
+
+    structured = build_structured_document(document)
+
+    assert [type(b).__name__ for b in structured.blocks] == ["ListBlock", "ParagraphBlock"]
+    assert structured.blocks[1].text == "A paragraph starts right here."
+
+
+def test_preceding_heading_stays_a_separate_block_from_the_list():
+    document = _document(["Week 4: Git, GitHub & APIs\n- Master Git basics\n- Push your first project"])
+
+    structured = build_structured_document(document)
+
+    assert [type(b).__name__ for b in structured.blocks] == ["HeadingBlock", "ListBlock"]
+    assert structured.blocks[0].text == "Week 4: Git, GitHub & APIs"
+    assert structured.blocks[1].items == ["Master Git basics", "Push your first project"]
+
+
+def test_span_invariant_holds_for_list_blocks():
+    document = _document(
+        [
+            "Week 4: Git, GitHub & APIs\n- Master Git basics\n- Push your first project\n\nClosing paragraph."
+        ]
+    )
+
+    structured = build_structured_document(document)
+
+    assert any(isinstance(b, ListBlock) for b in structured.blocks)
+    assert structured.validate_spans() == []
+    structured.assert_spans_valid()
+
+
+def test_monotonic_span_ordering_across_heading_list_and_paragraph_blocks():
+    document = _document(
+        [
+            "Week 4: Git, GitHub & APIs\n- Master Git basics\n- Push your first project\n\nClosing paragraph.",
+            "STEP 3\n- Fresh item on page two",
+        ]
+    )
+
+    structured = build_structured_document(document)
+
+    for previous, current in zip(structured.blocks, structured.blocks[1:]):
+        assert current.start_char >= previous.end_char
+
+
+def test_separate_list_blocks_on_different_pages_do_not_merge():
+    document = _document(["- Page one item", "- Page two item"])
+
+    structured = build_structured_document(document)
+
+    assert [type(b).__name__ for b in structured.blocks] == ["ListBlock", "ListBlock"]
+    assert [b.page for b in structured.blocks] == [1, 2]
 
 
 # --- content preservation ---
