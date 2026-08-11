@@ -145,7 +145,17 @@ class TableNormalizer:
             skips_column_one = len(segments) >= 2 and len(active_column_starts) >= 2 and 1 not in assigned_columns
 
             if _nearest_column(line.indent, active_column_starts) == 0 and not skips_column_one:
-                row = _parse_table_row(line, expected_columns=expected_columns)
+                # Prefer the segments already extracted from raw_text over
+                # re-parsing line.text: for a line classified "text" (as opposed to
+                # "table_row"), .text has had its internal whitespace collapsed by
+                # _classify_line, which can hide the very column gaps _parse_table_row
+                # needs to see - even though the position-based segments (computed from
+                # the unmodified raw_text) already found them just fine. Falling back to
+                # _parse_table_row only covers cases with too few positional segments,
+                # e.g. a single-space-separated row needing its token-count fallback.
+                row = [text for _, text in segments] if len(segments) >= 2 else _parse_table_row(
+                    line, expected_columns=expected_columns
+                )
                 if len(row) >= 2:
                     rows.append(row)
                     row_index += 1
