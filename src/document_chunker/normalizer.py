@@ -411,51 +411,15 @@ def _looks_like_table_continuation(
 
 
 def _build_table(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock | None, int]:
-    candidate_end_index = start_index
-    while candidate_end_index < len(lines):
-        line_type = lines[candidate_end_index].line_type
-        if line_type in {"blank", "list_item"}:
-            break
-        candidate_end_index += 1
+    """Row/cell reconstruction for a table region is delegated to TableNormalizer (see
+    table_normalizer.py) - a physical line is not necessarily a table row, so that module
+    owns detecting the header/column count, merging wrapped cell lines back into the
+    logical row they continue, and emitting complete rows in order. Imported locally to
+    avoid a circular import (table_normalizer.py reuses this module's line-parsing
+    helpers)."""
+    from document_chunker.table_normalizer import TableNormalizer
 
-    header = _parse_table_row(lines[start_index])
-    if len(header) < 2:
-        return None, start_index
-
-    rows = [header]
-    row_index = start_index + 1
-    while row_index < candidate_end_index:
-        line = lines[row_index]
-        row = _parse_table_row(line, expected_columns=len(header))
-        if len(row) >= 2:
-            rows.append(row)
-            row_index += 1
-            continue
-
-        if len(row) == 1 and len(rows) >= 2 and _looks_like_table_continuation(
-            lines,
-            continuation_index=row_index,
-            candidate_end_index=candidate_end_index,
-            expected_columns=len(header),
-            previous_row=rows[-1],
-        ):
-            _append_wrapped_table_text(rows[-1], row[0])
-            row_index += 1
-            continue
-        break
-
-    if len(rows) < 2:
-        return None, start_index
-
-    if _looks_like_header_row(rows[0], rows[1:]):
-        table_header = rows[0]
-        body = rows[1:]
-    else:
-        table_header = []
-        body = rows
-
-    table = NormalizedTable(header=table_header, rows=body)
-    return NormalizedBlock(block_type="table", table=table), row_index
+    return TableNormalizer().build(lines, start_index)
 
 
 def _build_paragraph(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock, int]:

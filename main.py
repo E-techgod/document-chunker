@@ -14,7 +14,7 @@ ACTIVE_CHUNKING_STRATEGY = "v2.2" # v1.0: character chunking with overlap, v2.1:
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
-    path = sys.argv[1] if len(sys.argv) > 1 else "data/sample.pdf"
+    path = sys.argv[1] if len(sys.argv) > 1 else "data/BAWSE.pdf"
     password = sys.argv[2] if len(sys.argv) > 2 else ""
     strategy_label, chunking_config = get_chunking_strategy(ACTIVE_CHUNKING_STRATEGY)
 
@@ -82,11 +82,16 @@ def main() -> None:
 
     for chunk in chunker.chunks[:4]:
         print(
-            f" ----------------------------------------------------------------------- Chunk {chunk.chunk_index} ----------------------------------------------------------------------- "
+           f" ----------------------------------------------------------------------- Chunk {chunk.chunk_index} ----------------------------------------------------------------------- "
         )
         if chunk.context_prefix:
             print(f"[context]\n{chunk.context_prefix}")
         print(f"[content]\n{chunk.text}\n")
+
+    print("Chunk 7: ")
+    print(f"[content]\n{chunker.chunks[7].text}\n")
+    print("Chunk 36: ")
+    print(f"[content]\n{chunker.chunks[36].text}\n")
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:
