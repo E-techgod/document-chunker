@@ -1,89 +1,43 @@
 # `Document Chunker`
 
-A PDF-in, clean-text-out pipeline I'm building step by step: validate the file, load it, pull the text out, then repair whatever the PDF extractor mangled on the way. Each stage is its own module with its own tests, and each one only trusts what the stage before it actually guarantees — nothing gets assumed for free.
+`document-chunker` is a PDF processing pipeline that takes a local PDF through validation, loading, extraction, normalization, chunking, and chunk validation. The repo is organized as small, testable modules with explicit schema boundaries, and the generated graph artifacts in `graphify-out/` make those runtime and test relationships easy to inspect.
 
-The end goal (hence the name) is chunking: turning a normalized document into retrieval-sized pieces. That stage doesn't exist yet — right now the pipeline stops after normalization, and `main.py` is a scratch runner for exercising the pipeline end to end, not a finished CLI.
+This is not just "text extraction" anymore. The current codebase includes:
+
+- input validation with `PDFDocumentInput`
+- PDF loading and decryption checks
+- page-by-page text extraction
+- layout-aware normalization into paragraphs, lists, headings, and tables
+- multiple chunking strategies
+- invariant-based chunk validation
+- generated graph reports for codebase inspection
 
 ## Architecture
 
-The graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, and `graphify-out/graph.html` shows the project organized around shared schemas, a linear processing pipeline, and a separate validation layer around chunking. The diagram below compresses that generated graph into the core runtime relationships.
+The generated graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, and `graphify-out/graph.html` currently reports:
 
-```mermaid
-flowchart LR
-  main["main.py"]
+- `558` nodes
+- `1301` edges
+- `22` communities
+- no import cycles detected
 
-  subgraph core["src/document_chunker"]
-    schemas["schemas.py
-    Pydantic models + computed metrics"]
-    counting["counting.py
-    count_words()"]
-    loader["loader.py
-    load_pdf()"]
-    extractor["extractor.py
-    extract_pdf()"]
-    normalizer["normalizer.py
-    normalize_document()
-    normalize_page()
-    repair_line_wraps()"]
-    chunker["chunker.py
-    chunk_document()"]
-    evaluator["evaluator.py
-    validate_chunks()"]
-  end
+Its highest-connectivity nodes are centered on `build_structured_document()`, `chunk_document()`, `validate_chunks()`, `normalize_page()`, and `extract_pdf()`, which matches the codebase's real center of gravity: normalization, chunking, validation, and their surrounding schemas/tests.
 
-  tests["tests/
-  stage-focused test suites"]
-  graphify["graphify-out/
-  GRAPH_REPORT.md, graph.json, graph.html"]
-
-  main --> schemas
-  main --> loader
-  main --> extractor
-  main --> normalizer
-  main --> chunker
-  main --> evaluator
-  main --> counting
-
-  loader --> schemas
-  extractor --> schemas
-  normalizer --> schemas
-  chunker --> schemas
-  evaluator --> schemas
-
-  normalizer --> counting
-  chunker --> counting
-  schemas --> counting
-
-  tests --> loader
-  tests --> extractor
-  tests --> normalizer
-  tests --> chunker
-  tests --> evaluator
-  tests --> schemas
-
-  graphify -.maps dependencies of.-> core
-  graphify -.summarizes test and module links.-> tests
-```
+The graph also shows the project has grown beyond the earlier linear "load/extract/normalize only" shape. In addition to the baseline pipeline, it now includes structural parsing helpers, table normalization/parsing, heading and list detection, chunking strategy selection, and validation-focused test communities.
 
 ## Pipeline
 
-This is the runtime document-processing path reflected in `main.py` and reinforced by the graph communities around `PDFDocumentInput`, `normalize_document`, `ChunkingConfig`, and `validate_chunks`.
+The runtime flow exercised by `main.py` is:
 
 ```mermaid
 flowchart TD
   input["PDF path + optional password"]
-  validate["PDFDocumentInput
-  validate path, extension, file size"]
-  load["load_pdf()
-  open, decrypt, verify pages"]
-  extract["extract_pdf()
-  build ExtractedDocument + ExtractedPage[]"]
-  normalize["normalize_document()
-  rebuild paragraphs, lists, and tables"]
-  chunk["chunk_document()
-  fixed-size overlapping character chunks"]
-  verify["validate_chunks()
-  order, size, overlap, coverage, traceability, offsets"]
+  validate["PDFDocumentInput"]
+  load["load_pdf()"]
+  extract["extract_pdf()"]
+  normalize["normalize_document()"]
+  chunk["chunk_document()"]
+  verify["validate_chunks()"]
   output["ChunkingResult + ChunkValidationReport"]
 
   input --> validate
@@ -95,61 +49,134 @@ flowchart TD
   verify --> output
 ```
 
-**Validate** — `PDFDocumentInput` (in `schemas.py`) is the gate everything else trusts. Before any PDF gets opened, pydantic checks the path is non-empty, exists, is an actual file, ends in `.pdf`, and isn't zero bytes.
+## What Each Stage Does
 
-**Load** — `load_pdf()` (`loader.py`) opens the file with `pypdf`, decrypts it if needed, and confirms it actually has pages. Corrupted files, unsupported encryption, wrong passwords, and empty PDFs all fail here as `PDFLoadError` instead of surfacing as a confusing crash later.
+**Validate**  
+`PDFDocumentInput` rejects empty paths, missing files, non-files, non-`.pdf` inputs, and zero-byte files before any PDF work starts.
 
-**Extract** — `extract_pdf()` (`extractor.py`) pulls text out page by page using pypdf's layout-aware extraction mode (`extraction_mode="layout"`), which keeps columns and spacing closer to how the page actually looks instead of dumping raw content-stream order. Every page becomes an `ExtractedPage`, blank pages are kept (not dropped), and the whole document is only rejected if *every* page comes back empty. This stage deliberately does no cleanup — it's a faithful record of what pypdf handed back, so bugs in later stages are never confused with extraction bugs.
+**Load**  
+`load_pdf()` opens the file with `pypdf`, handles encrypted PDFs, and raises `PDFLoadError` for corrupted files, unreadable content, bad passwords, or empty page sets.
 
-**Normalize** — `normalize_document()` (`normalizer.py`) is where the real work happens. Layout extraction is good at preserving structure but bad about soft-wrapping lines mid-sentence, so this stage classifies each line (heading, list item, table row, or plain text) and rebuilds paragraphs, lists, and tables from those pieces — rejoining lines that were only wrapped because the page ran out of width, while leaving genuine paragraph and list boundaries alone. It runs page-by-page so a layout quirk on one page can't bleed into the next, then recombines everything into a `NormalizedDocument` with both clean full text and a block-level structure (`NormalizedBlock`s: heading/paragraph/list/table) for anything downstream that wants structure instead of a text blob.
+**Extract**  
+`extract_pdf()` builds extracted document/page models from `pypdf` output. Blank pages are preserved, and the document is rejected only when the extracted result is effectively empty.
 
-Word and character counts are computed fields on the schemas themselves (via `count_words()` in `counting.py`), not hand-maintained — so a page's `word_count` can never drift from its `text`.
+**Normalize**  
+`normalize_document()` reconstructs cleaner text from layout-preserving extraction. It repairs wrapped lines and rebuilds page-level blocks such as headings, paragraphs, lists, and tables.
 
-## Layout
+**Chunk**  
+`chunk_document()` converts normalized content into `DocumentChunk` objects. The repo currently supports:
 
-```
-main.py                          # scratch runner: exercises the full pipeline against a sample PDF
+- `v1.0`: character chunking with overlap
+- `v2.1`: structural chunking with no context carry
+- `v2.2`: structural chunking with context carry
+
+`main.py` currently runs `v2.2` by default.
+
+**Validate Chunks**  
+`validate_chunks()` checks invariants such as order preservation, max-size rules, overlap behavior, non-whitespace coverage, traceability, offsets, structural integrity, and atomic element coverage.
+
+## Repository Layout
+
+```text
+main.py
 src/document_chunker/
-  schemas.py                     # PDFDocumentInput, Extracted*/Normalized* models
-  loader.py                      # load_pdf(), PDFLoadError
-  extractor.py                   # extract_pdf(), PDFExtractionError
-  normalizer.py                  # normalize_document(), line classification + block building
-  counting.py                    # count_words()
-tests/                           # one test file per pipeline stage, plus shared fixtures in conftest.py
-data/                            # sample PDFs used by main.py and the tests (invoice, receipt, resume, etc.)
-graphify-out/                    # generated codebase graph (GRAPH_REPORT.md, graph.json, graph.html)
+  chunker.py
+  chunking_strategies.py
+  counting.py
+  evaluator.py
+  extractor.py
+  heading_detector.py
+  list_detector.py
+  loader.py
+  normalizer.py
+  paragraph_normalizer.py
+  schemas.py
+  step2_pipeline.py
+  structured_models.py
+  table_normalizer.py
+  table_parser.py
+tests/
+graphify-out/
+data/
 ```
 
-## Running it
+At a high level:
 
-```
+- `schemas.py` defines the shared Pydantic models and computed counts
+- `loader.py`, `extractor.py`, and `normalizer.py` implement the core document pipeline
+- `chunker.py` and `chunking_strategies.py` implement chunk creation and strategy selection
+- `evaluator.py` validates chunk correctness with explicit invariants
+- `heading_detector.py`, `list_detector.py`, `paragraph_normalizer.py`, `table_normalizer.py`, and `table_parser.py` support structured normalization
+- `structured_models.py` contains a parallel structured-document model set for the Step 2 redesign work
+
+## Running It
+
+```bash
 uv run main.py [path/to/file.pdf] [password]
 ```
 
-Defaults to `data/sample.pdf` with no password if no arguments are given. It walks through validate → load → extract → normalize and prints the word/char counts at each stage so you can see what each step actually changed.
+If no arguments are provided, `main.py` defaults to `data/BAWSE.pdf`.
 
-## Strategy Comparison
+The runner currently:
 
-Chunking runs against `normalized_text`, not the structured blocks — the point is to have a baseline that later strategies (structure-aware, semantic, etc.) can be measured against on the exact same normalized input. Metrics below are computed on `data/sample.pdf` using the per-strategy configs shown in the table.
+- validates the input
+- loads and extracts the PDF
+- normalizes the document
+- chunks it using the active strategy
+- prints chunk ranges and sample chunk contents
+- validates the chunk output and exits non-zero on invariant failures
 
-- **Chunk size / Overlap / Stride** — the configured `max_chunk_size` / `overlap_size`, and the derived step between chunk starts (`stride = chunk_size - overlap`).
-- **Total chunk characters** — sum of every chunk's `char_count` (`ChunkingResult.total_char_count`). Overlapping regions get counted once per chunk that contains them, so this is normally >= source characters for overlap-based chunking, but can be slightly lower for structural chunking if boundary-only whitespace is omitted.
-- **Duplicate characters** — `total_chunk_characters − source_characters`: the excess from characters that appear in more than one chunk because of overlap. Structural chunking can make this negative when it drops boundary-only whitespace instead of duplicating it.
-- **Duplicate overhead %** — `duplicate_characters / source_characters × 100`: how much extra text (and therefore extra embeddings/storage) the overlap costs relative to the source.
+## Chunking Strategy Snapshot
+
+The README previously described chunking as future work. That is stale. The repo already contains working chunking and validation, plus a comparison summary derived from the current normalization/chunking pipeline:
 
 | Strategy | Source chars | Chunks | Chunk size | Overlap | Stride | Total chunk chars | Duplicate chars | Duplicate overhead % |
-|---|---|---|---|---|---|---|---|---|
-| Character (fixed-size, overlap) (max_chunks_size=1000, overlap_size (step_size)=100)| 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
-| Structural v2.1 (no context carry) | 7,576 | 8 | 1000 | 0 | 1000 | 7,567 | -9 | -0.12% |
-| Structural v2.2 (with context carry) | 7,576 | 8 | 1000 | 0 | 1000 | 7,568 | -8 | -0.11% |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Character chunking with overlap (`v1.0`) | 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
+| Structural chunking, no context carry (`v2.1`) | 7,576 | 8 | 1000 | 0 | 1000 | 7,567 | -9 | -0.12% |
+| Structural chunking, context carry (`v2.2`) | 7,576 | 8 | 1000 | 0 | 1000 | 7,568 | -8 | -0.11% |
 
-## Notes:
-On v2.2 context is dublicated, source content not 
+Those figures reflect the current sample comparison captured in the existing README/report context, where structural strategies slightly reduce duplicated storage overhead compared with fixed overlapping chunks.
 
 ## Tests
 
-Each pipeline stage has its own test file (`test_loader.py`, `test_extractor.py`, `test_normalizer.py`), covering both the happy path and the edge cases that motivated each design decision — encrypted/corrupted/empty PDFs, blank-page handling, idempotent normalization, table and list edge cases, etc. `conftest.py` holds the shared fixtures, including a real-PDF builder (`create_pdf`) and a fake `PdfReader` for testing extraction logic without touching disk.
+The graph report and test tree show coverage across the pipeline and its structural helpers, including:
 
-## Exploring the codebase
+- `test_loader.py`
+- `test_extractor.py`
+- `test_normalizer.py`
+- `test_normalizer_validation.py`
+- `test_chunker.py`
+- `test_evaluator.py`
+- `test_heading_detector.py`
+- `test_list_detector.py`
+- `test_paragraph_normalizer.py`
+- `test_table_normalizer.py`
+- `test_table_parser.py`
+- `test_structured_models.py`
 
-`graphify-out/` has a generated dependency/call graph of this repo (`GRAPH_REPORT.md` for a readable summary, `graph.html` to browse it, `graph.json` for the raw data) — useful for seeing how the pieces connect without reading every file. Regenerate it with `graphify update .` after making changes; it's cheap since it only re-analyzes what changed.
+The test suite is no longer just stage-by-stage smoke coverage. It also exercises structural reconstruction, table behavior, span invariants, and chunk/evaluator correctness.
+
+## Graph Artifacts
+
+`graphify-out/` contains three useful outputs:
+
+- `GRAPH_REPORT.md`: human-readable graph summary, community hubs, "god nodes", and graph freshness metadata
+- `graph.json`: raw node/edge/community data for downstream tooling
+- `graph.html`: interactive graph viewer
+
+The HTML viewer includes:
+
+- searchable nodes
+- clickable node inspection
+- neighbor browsing
+- community legend/filtering
+- graph statistics in the sidebar
+
+Regenerate the graph with:
+
+```bash
+graphify update .
+```
+
+The current report was generated on `2026-08-11` and records commit `805f251a` as its source snapshot.
