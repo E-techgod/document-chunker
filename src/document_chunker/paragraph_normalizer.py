@@ -3,11 +3,14 @@ from typing import Literal
 
 from document_chunker.heading_detector import detect_heading_level
 from document_chunker.list_detector import is_continuation_line, match_list_item
+from document_chunker.noise_detector import detect_noise_lines
 from document_chunker.normalizer import _HORIZONTAL_WHITESPACE_RE, _measure_indent, _preprocess_text
 from document_chunker.schemas import ExtractedDocument
 from document_chunker.structured_models import (
     HeadingBlock,
     ListBlock,
+    PageFooterBlock,
+    PageHeaderBlock,
     ParagraphBlock,
     StructuredNormalizedDocument,
     TableBlock,
@@ -38,7 +41,7 @@ from document_chunker.table_parser import is_table_row_candidate, parse_table_re
 # which reuses table_normalizer.TableNormalizer - the same position-based algorithm
 # already proven against this repo's own real-world PDF tables for the older pipeline.
 
-_BlockKind = Literal["heading", "paragraph", "list", "table"]
+_BlockKind = Literal["heading", "paragraph", "list", "table", "page_header", "page_footer"]
 
 
 @dataclass(frozen=True)
@@ -58,14 +61,20 @@ def _join_wrapped_lines(lines: list[str]) -> str:
     return _HORIZONTAL_WHITESPACE_RE.sub(" ", joined).strip()
 
 
-def _split_into_blocks(preprocessed_text: str) -> list[_BlockEntry]:
+def _split_into_blocks(
+    preprocessed_text: str, noise_line_indices: dict[int, str] | None = None
+) -> list[_BlockEntry]:
     """Walk preprocessed page text line by line, producing _BlockEntry objects in
-    document order."""
+    document order. `noise_line_indices` (from noise_detector.detect_noise_lines) maps
+    a line index to "page_header"/"page_footer" - those lines are pulled out as their
+    own block instead of being swept into a paragraph, checked before any other line
+    classification so a noise line is never misread as a table row or continuation."""
     entries: list[_BlockEntry] = []
     paragraph_lines: list[str] = []
     item_lines: list[str] = []
     completed_items: list[str] = []
     item_marker_indent: int | None = None
+    noise_line_indices = noise_line_indices or {}
 
     def flush_paragraph() -> None:
         text = _join_wrapped_lines(paragraph_lines)
@@ -96,6 +105,14 @@ def _split_into_blocks(preprocessed_text: str) -> list[_BlockEntry]:
         if not line:
             flush_paragraph()
             flush_list()
+            index += 1
+            continue
+
+        noise_kind = noise_line_indices.get(index)
+        if noise_kind is not None:
+            flush_paragraph()
+            flush_list()
+            entries.append(_BlockEntry(kind=noise_kind, text=line))
             index += 1
             continue
 
@@ -154,15 +171,18 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
     text search) - so a repeated block's offsets can never be misattributed to an
     earlier duplicate occurrence.
     """
+    preprocessed_pages = [_preprocess_text(page.text) for page in document.pages]
+    page_line_lists = [text.split("\n") for text in preprocessed_pages]
+    noise_by_page = detect_noise_lines(page_line_lists)
+
     entries: list[tuple[int, _BlockEntry]] = []
-    for page in document.pages:
-        preprocessed = _preprocess_text(page.text)
-        for entry in _split_into_blocks(preprocessed):
+    for page, preprocessed, noise_line_indices in zip(document.pages, preprocessed_pages, noise_by_page):
+        for entry in _split_into_blocks(preprocessed, noise_line_indices=noise_line_indices):
             entries.append((page.page_number, entry))
 
     full_text = "\n\n".join(entry.text for _, entry in entries)
 
-    blocks: list[HeadingBlock | ParagraphBlock | ListBlock | TableBlock] = []
+    blocks: list[HeadingBlock | ParagraphBlock | ListBlock | TableBlock | PageHeaderBlock | PageFooterBlock] = []
     cursor = 0
     for index, (page_number, entry) in enumerate(entries):
         start = cursor
@@ -191,6 +211,14 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
                     columns=entry.columns,
                     rows=entry.rows,
                 )
+            )
+        elif entry.kind == "page_header":
+            blocks.append(
+                PageHeaderBlock(block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end)
+            )
+        elif entry.kind == "page_footer":
+            blocks.append(
+                PageFooterBlock(block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end)
             )
         else:
             blocks.append(ParagraphBlock(block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end))

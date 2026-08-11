@@ -2,7 +2,14 @@ import re
 
 from document_chunker.paragraph_normalizer import build_structured_document
 from document_chunker.schemas import ExtractedDocument, ExtractedPage
-from document_chunker.structured_models import HeadingBlock, ListBlock, ParagraphBlock
+from document_chunker.step2_pipeline import validate_structured_document
+from document_chunker.structured_models import (
+    HeadingBlock,
+    ListBlock,
+    PageFooterBlock,
+    PageHeaderBlock,
+    ParagraphBlock,
+)
 
 
 def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:
@@ -379,3 +386,65 @@ def test_no_content_dropped_across_multiple_pages_with_blank_page():
 
     expected_tokens = [tok for page in raw_pages for tok in _non_whitespace_tokens(page)]
     assert _non_whitespace_tokens(structured.full_text) == expected_tokens
+
+
+# --- noise detection (running headers/footers) ---
+
+
+def _paged_document_with_repeated_header_and_footer() -> ExtractedDocument:
+    # Body/subtitle lines vary by word (not digit) so digit-collapsing normalization in
+    # noise_detector doesn't accidentally treat them as a recurring header/footer line -
+    # only "Company Confidential" (verbatim-repeated) and "Page N" (page-number pattern)
+    # are meant to be flagged as noise here.
+    ordinals = ["one", "two", "three"]
+    texts = [
+        f"Company Confidential\n"
+        f"Unique subtitle {ordinal}\n"
+        f"This is body content unique to page {ordinal} with real prose that should stay intact.\n"
+        f"Page {n}"
+        for n, ordinal in enumerate(ordinals, start=1)
+    ]
+    return _document(texts)
+
+
+def test_repeated_header_line_becomes_page_header_block():
+    document = _paged_document_with_repeated_header_and_footer()
+
+    structured = build_structured_document(document)
+
+    header_blocks = [b for b in structured.blocks if isinstance(b, PageHeaderBlock)]
+    assert len(header_blocks) == 3
+    assert all(b.text == "Company Confidential" for b in header_blocks)
+    assert all(b.is_noise for b in header_blocks)
+
+
+def test_page_number_footer_line_becomes_page_footer_block():
+    document = _paged_document_with_repeated_header_and_footer()
+
+    structured = build_structured_document(document)
+
+    footer_blocks = [b for b in structured.blocks if isinstance(b, PageFooterBlock)]
+    assert [b.text for b in footer_blocks] == ["Page 1", "Page 2", "Page 3"]
+    assert all(b.is_noise for b in footer_blocks)
+
+
+def test_content_blocks_excludes_noise_but_keeps_body_paragraphs():
+    document = _paged_document_with_repeated_header_and_footer()
+
+    structured = build_structured_document(document)
+
+    assert [type(b).__name__ for b in structured.content_blocks] == ["ParagraphBlock"] * 3
+    assert [b.text for b in structured.content_blocks] == [
+        "Unique subtitle one This is body content unique to page one with real prose that should stay intact.",
+        "Unique subtitle two This is body content unique to page two with real prose that should stay intact.",
+        "Unique subtitle three This is body content unique to page three with real prose that should stay intact.",
+    ]
+
+
+def test_noise_blocks_are_still_counted_as_preserved_content():
+    document = _paged_document_with_repeated_header_and_footer()
+
+    structured = build_structured_document(document)
+    issues = validate_structured_document(structured, source=document)
+
+    assert issues == []

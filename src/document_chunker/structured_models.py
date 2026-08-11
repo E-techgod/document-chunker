@@ -16,11 +16,12 @@ class NormalizedBlock(BaseModel):
     """Common attributes shared by every reconstructed layout block."""
 
     block_id: str
-    type: Literal["heading", "paragraph", "list", "table"]
+    type: Literal["heading", "paragraph", "list", "table", "page_header", "page_footer"]
     text: str
     page: int = Field(ge=1)
     start_char: int = Field(ge=0)
     end_char: int = Field(ge=0)
+    is_noise: bool = False
 
 
 class HeadingBlock(NormalizedBlock):
@@ -30,6 +31,23 @@ class HeadingBlock(NormalizedBlock):
 
 class ParagraphBlock(NormalizedBlock):
     type: Literal["paragraph"] = "paragraph"
+
+
+class PageHeaderBlock(NormalizedBlock):
+    """A running header, detected by recurring text (or a page-number pattern) at the
+    top of many pages - see noise_detector.detect_noise_lines. Kept as a normal block
+    for traceability; is_noise marks it excludable from chunkable content."""
+
+    type: Literal["page_header"] = "page_header"
+    is_noise: bool = True
+
+
+class PageFooterBlock(NormalizedBlock):
+    """A running footer (page numbers, repeated branding/copyright), detected the same
+    way as PageHeaderBlock but from the bottom of the page."""
+
+    type: Literal["page_footer"] = "page_footer"
+    is_noise: bool = True
 
 
 class ListBlock(NormalizedBlock):
@@ -53,7 +71,7 @@ class TableBlock(NormalizedBlock):
 
 
 AnyBlock = Annotated[
-    Union[HeadingBlock, ParagraphBlock, ListBlock, TableBlock],
+    Union[HeadingBlock, ParagraphBlock, ListBlock, TableBlock, PageHeaderBlock, PageFooterBlock],
     Field(discriminator="type"),
 ]
 
@@ -73,6 +91,13 @@ class StructuredNormalizedDocument(BaseModel):
                 raise ValueError(f"duplicate block_id: {block.block_id!r}")
             seen.add(block.block_id)
         return self
+
+    @property
+    def content_blocks(self) -> list[AnyBlock]:
+        """blocks excluding detected noise (page headers/footers, page numbers,
+        repeated branding/copyright) - the set a chunker should consume. `blocks`
+        itself keeps everything, noise included, for traceability."""
+        return [block for block in self.blocks if not block.is_noise]
 
     def to_dict(self) -> dict:
         """Dump the document to a plain dict (debugging/inspection - no I/O)."""

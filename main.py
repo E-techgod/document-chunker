@@ -88,14 +88,14 @@ def main() -> None:
             print(f"[context]\n{chunk.context_prefix}")
         print(f"[content]\n{chunk.text}\n")
 
-    """print("Chunk 7: ")
+    print("Chunk 7: ")
     print(f"[content]\n{chunker.chunks[7].text}\n")
     print("Chunk 17: ")
     print(f"[content]\n{chunker.chunks[17].text}\n")
     print("Chunk 24: ")
     print(f"[content]\n{chunker.chunks[24].text}\n")
     print("Chunk 38: ")
-    print(f"[content]\n{chunker.chunks[38].text}\n")"""
+    print(f"[content]\n{chunker.chunks[38].text}\n")
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:

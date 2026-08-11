@@ -6,6 +6,8 @@ from pydantic import ValidationError
 from document_chunker.structured_models import (
     HeadingBlock,
     ListBlock,
+    PageFooterBlock,
+    PageHeaderBlock,
     ParagraphBlock,
     StructuredNormalizedDocument,
     TableBlock,
@@ -101,6 +103,37 @@ def test_block_requires_page_at_least_one():
         HeadingBlock(block_id="block_001", text="Overview", page=0, start_char=0, end_char=8)
 
 
+# --- noise blocks (page headers/footers) ---
+
+
+def test_content_block_types_default_is_noise_false():
+    heading = HeadingBlock(block_id="block_001", text="Overview", page=1, start_char=0, end_char=8)
+    paragraph = ParagraphBlock(block_id="block_002", text="Some prose.", page=1, start_char=9, end_char=20)
+
+    assert heading.is_noise is False
+    assert paragraph.is_noise is False
+
+
+def test_page_header_block_defaults_type_and_is_noise():
+    block = PageHeaderBlock(block_id="block_001", text="Running Title", page=1, start_char=0, end_char=13)
+
+    assert block.type == "page_header"
+    assert block.is_noise is True
+
+
+def test_page_footer_block_defaults_type_and_is_noise():
+    block = PageFooterBlock(block_id="block_001", text="Page 3", page=1, start_char=0, end_char=6)
+
+    assert block.type == "page_footer"
+    assert block.is_noise is True
+
+
+def test_is_noise_can_be_overridden_explicitly():
+    block = ParagraphBlock(block_id="block_001", text="Confidential", page=1, start_char=0, end_char=12, is_noise=True)
+
+    assert block.is_noise is True
+
+
 # --- container model / polymorphism ---
 
 
@@ -131,6 +164,32 @@ def _sample_document() -> StructuredNormalizedDocument:
             ),
         ],
     )
+
+
+def _sample_document_with_noise() -> StructuredNormalizedDocument:
+    full_text = "Running Title\nOverview\nSome prose.\nPage 1"
+    return StructuredNormalizedDocument(
+        document_id="doc1",
+        full_text=full_text,
+        blocks=[
+            PageHeaderBlock(block_id="block_001", text="Running Title", page=1, start_char=0, end_char=13),
+            HeadingBlock(block_id="block_002", text="Overview", page=1, start_char=14, end_char=22, level=1),
+            ParagraphBlock(block_id="block_003", text="Some prose.", page=1, start_char=23, end_char=34),
+            PageFooterBlock(block_id="block_004", text="Page 1", page=1, start_char=35, end_char=41),
+        ],
+    )
+
+
+def test_content_blocks_excludes_noise_blocks():
+    document = _sample_document_with_noise()
+
+    assert [b.block_id for b in document.content_blocks] == ["block_002", "block_003"]
+
+
+def test_content_blocks_is_all_blocks_when_no_noise_present():
+    document = _sample_document()
+
+    assert document.content_blocks == document.blocks
 
 
 def test_document_holds_polymorphic_block_list_in_order():
@@ -189,6 +248,18 @@ def test_document_model_validate_reconstructs_correct_block_subclasses_from_dict
     assert restored.blocks[0].level == 1
     assert restored.blocks[2].items == ["first", "second"]
     assert restored.blocks[3].rows == [["Ana", "98"]]
+
+
+def test_noise_blocks_round_trip_through_to_dict_and_model_validate():
+    document = _sample_document_with_noise()
+
+    restored = StructuredNormalizedDocument.model_validate(document.to_dict())
+
+    assert restored == document
+    assert isinstance(restored.blocks[0], PageHeaderBlock)
+    assert isinstance(restored.blocks[3], PageFooterBlock)
+    assert restored.blocks[0].is_noise is True
+    assert restored.blocks[3].is_noise is True
 
 
 # --- span invariant validator ---
