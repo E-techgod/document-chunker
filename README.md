@@ -142,6 +142,8 @@ Chunking runs against `normalized_text`, not the structured blocks — the point
 | Character (fixed-size, overlap) (max_chunks_size=1000, overlap_size (step_size)=100)| 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
 | Structural v2.1 (no context carry) | 7,576 | 8 | 1000 | 0 | 1000 | 7,567 | -9 | -0.12% |
 | Structural v2.2 (with context carry) | 7,576 | 8 | 1000 | 0 | 1000 | 7,568 | -8 | -0.11% |
+
+## Notes:
 On v2.2 context is dublicated, source content not 
 
 ## Tests
