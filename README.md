@@ -1,4 +1,4 @@
-# `document-chunker`
+# `Document Chunker`
 
 A PDF-in, clean-text-out pipeline I'm building step by step: validate the file, load it, pull the text out, then repair whatever the PDF extractor mangled on the way. Each stage is its own module with its own tests, and each one only trusts what the stage before it actually guarantees — nothing gets assumed for free.
 
