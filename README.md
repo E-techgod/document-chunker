@@ -1,13 +1,15 @@
 # `Document Chunker`
 
-`document-chunker` is a PDF processing pipeline that takes a local PDF through validation, loading, extraction, normalization, chunking, and chunk validation. The repo is organized as small, testable modules with explicit schema boundaries, and the generated graph artifacts in `graphify-out/` make those runtime and test relationships easy to inspect.
+`document-chunker` is a PDF processing pipeline that takes a local PDF through validation, loading, extraction, structured reconstruction, normalization, chunking, and chunk validation. The repo is still organized around small, testable stages with explicit schema boundaries, and the generated graph artifacts in `graphify-out/` make the runtime and test relationships easy to inspect.
 
 This is not just "text extraction" anymore. The current codebase includes:
 
 - input validation with `PDFDocumentInput`
 - PDF loading and decryption checks
 - page-by-page text extraction
-- layout-aware normalization into paragraphs, lists, headings, and tables
+- structured reconstruction into headings, paragraphs, lists, and tables
+- noise detection for repeated headers, footers, and page numbers
+- a bridge back into the normalized document model used for chunking
 - multiple chunking strategies
 - invariant-based chunk validation
 - generated graph reports for codebase inspection
@@ -16,9 +18,9 @@ This is not just "text extraction" anymore. The current codebase includes:
 
 The generated graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, and `graphify-out/graph.html` currently reports:
 
-- `558` nodes
-- `1301` edges
-- `22` communities
+- `653` nodes
+- `1470` edges
+- `24` communities
 - no import cycles detected
 
 ```mermaid
@@ -34,13 +36,17 @@ flowchart LR
 
   subgraph core["src/document_chunker"]
     schemas["schemas.py
-    shared models + computed counts"]
+    shared models + chunking config"]
     loader["loader.py
     PDF loading"]
     extractor["extractor.py
     text extraction"]
-    normalizer["normalizer.py
-    document normalization"]
+    structured["paragraph_normalizer.py
+    structured reconstruction"]
+    step2["step2_pipeline.py
+    structured validation"]
+    bridge["structured_bridge.py
+    bridge to normalized model"]
     chunker["chunker.py
     chunk generation"]
     evaluator["evaluator.py
@@ -49,45 +55,48 @@ flowchart LR
     strategy selection"]
   end
 
-  subgraph structure["Structured normalization helpers"]
+  subgraph helpers["Structured helpers"]
     heading["heading_detector.py"]
     listd["list_detector.py"]
+    noise["noise_detector.py"]
     paragraph["paragraph_normalizer.py"]
     table_norm["table_normalizer.py"]
     table_parse["table_parser.py"]
-    structured["structured_models.py"]
-    step2["step2_pipeline.py"]
+    structured_models["structured_models.py"]
   end
 
   data --> main
   main --> loader
   main --> extractor
-  main --> normalizer
+  main --> structured
+  main --> step2
+  main --> bridge
   main --> chunker
   main --> evaluator
   main --> strategies
 
   loader --> schemas
   extractor --> schemas
-  normalizer --> schemas
+  structured --> schemas
+  bridge --> schemas
   chunker --> schemas
   evaluator --> schemas
   strategies --> schemas
 
-  normalizer --> heading
-  normalizer --> listd
-  normalizer --> paragraph
-  normalizer --> table_norm
-  normalizer --> table_parse
-  step2 --> structured
+  structured --> heading
+  structured --> listd
+  structured --> noise
+  structured --> table_norm
+  structured --> table_parse
+  structured_models --> step2
 
   tests --> core
-  tests --> structure
+  tests --> helpers
   graphify -. maps repo relationships .-> core
-  graphify -. summarizes test and module communities .-> tests
+  graphify -. surfaces test and module communities .-> tests
 ```
 
-The graph's highest-connectivity nodes are centered on `build_structured_document()`, `chunk_document()`, `validate_chunks()`, `normalize_page()`, and `extract_pdf()`, which matches the codebase's real center of gravity: normalization, chunking, validation, and their surrounding schemas/tests.
+The graph's highest-connectivity nodes are centered on `build_structured_document()`, `chunk_document()`, `validate_chunks()`, `normalize_page()`, and `extract_pdf()`, which matches the codebase's real center of gravity: reconstructing document structure cleanly enough that chunking and validation remain trustworthy.
 
 ## Pipeline
 
@@ -99,7 +108,9 @@ flowchart TD
   validate["PDFDocumentInput"]
   load["load_pdf()"]
   extract["extract_pdf()"]
-  normalize["normalize_document()"]
+  structured["build_structured_document()"]
+  step2["validate_structured_document()"]
+  bridge["to_normalized_document()"]
   chunk["chunk_document()"]
   verify["validate_chunks()"]
   output["ChunkingResult + ChunkValidationReport"]
@@ -107,8 +118,10 @@ flowchart TD
   input --> validate
   validate --> load
   load --> extract
-  extract --> normalize
-  normalize --> chunk
+  extract --> structured
+  structured --> step2
+  step2 --> bridge
+  bridge --> chunk
   chunk --> verify
   verify --> output
 ```
@@ -124,8 +137,14 @@ flowchart TD
 **Extract**  
 `extract_pdf()` builds extracted document/page models from `pypdf` output. Blank pages are preserved, and the document is rejected only when the extracted result is effectively empty.
 
-**Normalize**  
-`normalize_document()` reconstructs cleaner text from layout-preserving extraction. It repairs wrapped lines and rebuilds page-level blocks such as headings, paragraphs, lists, and tables.
+**Reconstruct Structure**  
+`build_structured_document()` rebuilds cleaner document structure from extracted page text, classifying headings, paragraphs, lists, tables, and noise. The helper modules around it are where most of the layout-sensitive work now lives.
+
+**Validate Structured Output**  
+`validate_structured_document()` checks Step 2 invariants against the extracted source. `main.py` treats those findings as warnings rather than fatal errors because some known edge cases are documented limitations, not pipeline breakages.
+
+**Bridge to the Chunking Model**  
+`to_normalized_document()` converts the structured representation back into the normalized document shape expected by the chunker and evaluator.
 
 **Chunk**  
 `chunk_document()` converts normalized content into `DocumentChunk` objects. The repo currently supports:
@@ -139,7 +158,7 @@ flowchart TD
 **Validate Chunks**  
 `validate_chunks()` checks invariants such as order preservation, max-size rules, overlap behavior, non-whitespace coverage, traceability, offsets, structural integrity, and atomic element coverage.
 
-## Repository Layout
+## Repository Shape
 
 ```text
 main.py
@@ -152,10 +171,12 @@ src/document_chunker/
   heading_detector.py
   list_detector.py
   loader.py
+  noise_detector.py
   normalizer.py
   paragraph_normalizer.py
   schemas.py
   step2_pipeline.py
+  structured_bridge.py
   structured_models.py
   table_normalizer.py
   table_parser.py
@@ -166,12 +187,9 @@ data/
 
 At a high level:
 
-- `schemas.py` defines the shared Pydantic models and computed counts
-- `loader.py`, `extractor.py`, and `normalizer.py` implement the core document pipeline
-- `chunker.py` and `chunking_strategies.py` implement chunk creation and strategy selection
-- `evaluator.py` validates chunk correctness with explicit invariants
-- `heading_detector.py`, `list_detector.py`, `paragraph_normalizer.py`, `table_normalizer.py`, and `table_parser.py` support structured normalization
-- `structured_models.py` contains a parallel structured-document model set for the Step 2 redesign work
+- the core story is still validate -> extract -> reconstruct -> chunk -> verify
+- the repo now has a real structured-document layer, not just flattened normalized text
+- the tests are split across stage behavior, structural reconstruction, and invariant enforcement
 
 ## Running It
 
@@ -185,26 +203,15 @@ The runner currently:
 
 - validates the input
 - loads and extracts the PDF
-- normalizes the document
-- chunks it using the active strategy
+- builds and checks the structured document
+- bridges that structure into the normalized chunking model
+- chunks with the active strategy
 - prints chunk ranges and sample chunk contents
-- validates the chunk output and exits non-zero on invariant failures
-
-## Chunking Strategy Snapshot
-
-The README previously described chunking as future work. That is stale. The repo already contains working chunking and validation, plus a comparison summary derived from the current normalization/chunking pipeline:
-
-| Strategy | Source chars | Chunks | Chunk size | Overlap | Stride | Total chunk chars | Duplicate chars | Duplicate overhead % |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Character chunking with overlap (`v1.0`) | 7,579 | 9 | 1000 | 100 | 900 | 8,379 | 800 | 10.56% |
-| Structural chunking, no context carry (`v2.1`) | 7,576 | 8 | 1000 | 0 | 1000 | 7,567 | -9 | -0.12% |
-| Structural chunking, context carry (`v2.2`) | 7,576 | 8 | 1000 | 0 | 1000 | 7,568 | -8 | -0.11% |
-
-Those figures reflect the current sample comparison captured in the existing README/report context, where structural strategies slightly reduce duplicated storage overhead compared with fixed overlapping chunks.
+- validates the chunk output and exits non-zero on chunk invariant failures
 
 ## Tests
 
-The graph report and test tree show coverage across the pipeline and its structural helpers, including:
+The graph report and current test tree show coverage across the pipeline and its structural helpers, including:
 
 - `test_loader.py`
 - `test_extractor.py`
@@ -214,12 +221,14 @@ The graph report and test tree show coverage across the pipeline and its structu
 - `test_evaluator.py`
 - `test_heading_detector.py`
 - `test_list_detector.py`
+- `test_noise_detector.py`
 - `test_paragraph_normalizer.py`
 - `test_table_normalizer.py`
 - `test_table_parser.py`
+- `test_structured_bridge.py`
 - `test_structured_models.py`
 
-The test suite is no longer just stage-by-stage smoke coverage. It also exercises structural reconstruction, table behavior, span invariants, and chunk/evaluator correctness.
+The suite is not just stage-by-stage smoke coverage. It also exercises structural reconstruction, heading/list heuristics, noise detection, table behavior, bridging, and chunk/evaluator invariants.
 
 ## Graph Artifacts
 
@@ -243,4 +252,4 @@ Regenerate the graph with:
 graphify update .
 ```
 
-The current report was generated on `2026-08-11` and records commit `805f251a` as its source snapshot.
+The current report was generated on `2026-08-12` and records commit `b9081536` as its source snapshot.
