@@ -207,6 +207,20 @@ class TableNormalizer:
         continuation_text = segments[0][1] if segments else _normalize_inline_text(line.text)
         _append_wrapped_table_text(row, continuation_text)
 
+    def _has_exact_two_row_coherence(
+        self, lines: list[ClassifiedLine], start_index: int, rows: list[list[str]]
+    ) -> bool:
+        """The weakest table evidence is exactly two reconstructed rows: one candidate
+        header plus one body row. In that case require the body's own natural
+        position-based segmentation count (before any later rectangularization) to match
+        the header's column count, or reject the region as prose that only happens to be
+        column-like line-by-line."""
+        if len(rows) != 2:
+            return True
+
+        body_segments = _segment_positions(lines[start_index + 1].raw_text)
+        return len(body_segments) == len(rows[0])
+
     def build(self, lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock | None, int]:
         header_values = self.detect_header(lines, start_index)
         if len(header_values) < 2:
@@ -216,7 +230,7 @@ class TableNormalizer:
         column_starts = self.infer_column_starts(lines[start_index])
         rows, _, consumed_index = self.reconstruct_rows(lines, start_index, end_index, header_values, column_starts)
 
-        if len(rows) < 2:
+        if len(rows) < 2 or not self._has_exact_two_row_coherence(lines, start_index, rows):
             return None, start_index
 
         if _looks_like_header_row(rows[0], rows[1:]):
@@ -242,7 +256,7 @@ class TableNormalizer:
             lines, start_index, end_index, header_values, column_starts
         )
 
-        if len(rows) < 2:
+        if len(rows) < 2 or not self._has_exact_two_row_coherence(lines, start_index, rows):
             return None, start_index, []
 
         if _looks_like_header_row(rows[0], rows[1:]):

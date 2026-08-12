@@ -64,6 +64,18 @@ def test_non_table_region_returns_none():
     assert consumed == 0
 
 
+def test_two_unrelated_pipe_separated_lines_are_rejected_as_a_table():
+    lines = [
+        "Leverage Play | domain knowledge",
+        "Updated June 2026 | baswe.Ai Engineer Accelerator™ | BASWE LLC",
+    ]
+
+    result, consumed = parse_table_region(lines, 0)
+
+    assert result is None
+    assert consumed == 0
+
+
 def test_table_region_stops_before_noise_flagged_footer_line():
     lines = [
         "Step | Window | Hours",
