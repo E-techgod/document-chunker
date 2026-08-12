@@ -92,6 +92,28 @@ def test_page_boundary_always_starts_a_new_paragraph_even_without_a_blank_line()
     assert [b.page for b in structured.blocks] == [1, 2]
 
 
+def test_mid_sentence_page_break_between_paragraph_blocks_renders_with_space_and_keeps_spans():
+    document = _document(["You will be a competitive candidate in 12", "months.\n\nSTEP 1"])
+
+    structured = build_structured_document(document)
+
+    assert structured.full_text == "You will be a competitive candidate in 12 months.\n\nSTEP 1"
+    assert [b.page for b in structured.blocks] == [1, 2, 2]
+    assert [type(b).__name__ for b in structured.blocks] == ["ParagraphBlock", "ParagraphBlock", "HeadingBlock"]
+    for block in structured.blocks:
+        assert structured.full_text[block.start_char : block.end_char] == block.text
+    assert validate_structured_document(structured, source=document) == []
+
+
+def test_page_boundary_keeps_double_newline_for_intentional_paragraph_break():
+    document = _document(["This paragraph is complete.", "Another paragraph starts here."])
+
+    structured = build_structured_document(document)
+
+    assert structured.full_text == "This paragraph is complete.\n\nAnother paragraph starts here."
+    assert [b.page for b in structured.blocks] == [1, 2]
+
+
 def test_blank_page_contributes_no_blocks():
     document = _document(["Page one text.", "", "Page three text."])
 

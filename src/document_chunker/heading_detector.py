@@ -6,7 +6,8 @@ import re
 # line-by-line pass, so it isn't judged here). Font/bold metadata isn't available (the
 # Extractor stays plain-text-only, per the Phase 1 scoping decision), so the only content
 # signal used is an explicit structural numbering prefix (CHAPTER 01, STEP 3, Week 5:,
-# Month 2 -, Section 4.1).
+# Month 2 -, Section 4.1), plus a narrow fallback for short standalone all-caps section
+# titles.
 #
 # Deliberately NOT a signal: all-caps / uppercase ratio on its own. A narrative callout
 # like "CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND" is capitalized for emphasis, not
@@ -19,23 +20,44 @@ _HEADING_PATTERN_RE = re.compile(
 )
 _NUMBERING_RE = re.compile(r"\d+(?:\.\d+)*")
 _LIST_ITEM_PREFIX_RE = re.compile(r"^(?:[●•\-→]|\d+[.)])\s+")
+_ALL_CAPS_HEADING_RE = re.compile(r"^[A-Z0-9/&()'’.,\-–—\s]+$")
+_INLINE_PUNCTUATION_RE = re.compile(r"[:.;!?]")
+_MIN_ALL_CAPS_WORDS = 2
+_MAX_ALL_CAPS_WORDS = 4
+
+
+def _is_short_all_caps_heading(stripped: str) -> bool:
+    if _INLINE_PUNCTUATION_RE.search(stripped):
+        return False
+    if not _ALL_CAPS_HEADING_RE.fullmatch(stripped):
+        return False
+
+    words = stripped.split()
+    if not (_MIN_ALL_CAPS_WORDS <= len(words) <= _MAX_ALL_CAPS_WORDS):
+        return False
+
+    # Require at least one alphabetic token so digit-only separators do not qualify.
+    return any(any(char.isalpha() for char in word) for word in words)
 
 
 def detect_heading_level(text: str) -> int | None:
     """The heading level (1 for a bare number like "CHAPTER 01", 2+ for each further
     dot-separated numbering segment - "Section 4.1" -> 2) if `text` matches an explicit
-    structural heading prefix, else None. `text` is expected to be a single physical
-    line (paragraph_normalizer calls this once per line); a multi-line string will never
-    match, since the pattern is anchored to the whole string."""
+    structural heading prefix, or 2 for a short standalone all-caps section title, else
+    None. `text` is expected to be a single physical line (paragraph_normalizer calls
+    this once per line); a multi-line string will never match, since the patterns are
+    anchored to the whole string."""
     stripped = text.strip()
     if not stripped or len(stripped) > _MAX_HEADING_LENGTH:
         return None
     if _LIST_ITEM_PREFIX_RE.match(stripped):
         return None
-    if not _HEADING_PATTERN_RE.match(stripped):
-        return None
+    if _HEADING_PATTERN_RE.match(stripped):
+        numbering = _NUMBERING_RE.search(stripped)
+        if not numbering:
+            return 1
+        return len(numbering.group().split("."))
+    if _is_short_all_caps_heading(stripped):
+        return 2
 
-    numbering = _NUMBERING_RE.search(stripped)
-    if not numbering:
-        return 1
-    return len(numbering.group().split("."))
+    return None

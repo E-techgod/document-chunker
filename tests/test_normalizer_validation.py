@@ -11,6 +11,7 @@ from document_chunker.step2_pipeline import normalize_document, validate_structu
 from document_chunker.structured_models import (
     HeadingBlock,
     ListBlock,
+    PageFooterBlock,
     ParagraphBlock,
     StructuredNormalizedDocument,
     TableBlock,
@@ -148,6 +149,42 @@ def test_invariant_lossless_content_ignores_table_pipe_rendering():
     structured = build_structured_document(document)
     issues = validate_structured_document(structured, source=document)
     assert issues == []
+
+
+def test_noise_flagged_footer_is_emitted_separately_not_embedded_in_table_text():
+    footer = "baswe.Ai Engineer Accelerator™ | Page 6"
+    document = _document(
+        [
+            "STEP 1\n"
+            "Step | Window | Hours\n"
+            "1 | Week 1–2 | 5–10 hours total\n"
+            f"{footer}\n"
+            "Pull 10–15 real job descriptions.",
+            "STEP 2\n"
+            "Step | Window | Hours\n"
+            "2 | Month 1–2 | 6–8 hrs/week\n"
+            f"{footer}\n"
+            "Build the mathematical foundation.",
+            "STEP 3\n"
+            "Step | Window | Hours\n"
+            "3 | Months 3–4 | 8–10 hrs/week\n"
+            f"{footer}\n"
+            "Ship a portfolio project.",
+        ],
+        document_id="noise_table_boundary",
+    )
+
+    structured = build_structured_document(document)
+    issues = validate_structured_document(structured, source=document)
+
+    assert issues == []
+    assert sum(isinstance(block, PageFooterBlock) for block in structured.blocks) == 3
+
+    for block in structured.blocks:
+        if not isinstance(block, TableBlock):
+            continue
+        assert footer not in block.text
+        assert all(footer not in cell for row in [block.columns, *block.rows] for cell in row)
 
 
 # --- Invariant 5: table rectangularity ---

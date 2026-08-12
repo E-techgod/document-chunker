@@ -1,3 +1,5 @@
+import re
+
 from document_chunker.normalizer import _EXCESS_BLANK_LINES_RE, BlockEntry, _render_blocks
 from document_chunker.schemas import ExtractedDocument
 from document_chunker.schemas import NormalizedBlock as SchemaBlock
@@ -20,6 +22,22 @@ from document_chunker.structured_models import (
 # unambiguous.
 
 NORMALIZED_STRATEGY = "step2-structural-noise-filtered"
+_MID_SENTENCE_CONTINUATION_RE = re.compile(r"[.!?:][\"')\]]*$")
+
+
+def _starts_with_lowercase(text: str) -> bool:
+    stripped = text.lstrip()
+    return bool(stripped) and stripped[0].islower()
+
+
+def _page_delimiter(current_text: str, next_text: str) -> str:
+    if not current_text or not next_text:
+        return "\n\n"
+    if _MID_SENTENCE_CONTINUATION_RE.search(current_text.rstrip()):
+        return "\n\n"
+    if _starts_with_lowercase(next_text):
+        return " "
+    return "\n\n"
 
 
 def _to_schema_block(block: AnyBlock) -> SchemaBlock:
@@ -57,7 +75,9 @@ def to_normalized_document(
         text, positioned_blocks = _render_blocks(entries)
         pages.append(NormalizedPage(page_number=page.page_number, text=text, blocks=positioned_blocks))
 
-    full_text = _EXCESS_BLANK_LINES_RE.sub("\n\n", "\n\n".join(page.text for page in pages))
+    delimiters = [_page_delimiter(current.text, following.text) for current, following in zip(pages, pages[1:])]
+    full_text = "".join(page.text + (delimiters[index] if index < len(delimiters) else "") for index, page in enumerate(pages))
+    full_text = _EXCESS_BLANK_LINES_RE.sub("\n\n", full_text)
 
     return NormalizedDocument(
         document_id=document.document_id,

@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -42,6 +43,7 @@ from document_chunker.table_parser import is_table_row_candidate, parse_table_re
 # already proven against this repo's own real-world PDF tables for the older pipeline.
 
 _BlockKind = Literal["heading", "paragraph", "list", "table", "page_header", "page_footer"]
+_MID_SENTENCE_CONTINUATION_RE = re.compile(r"[.!?:][\"')\]]*$")
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,23 @@ def _join_wrapped_lines(lines: list[str]) -> str:
     single space, collapse internal multi-space/tab runs to one, and trim the ends."""
     joined = " ".join(line.strip() for line in lines if line.strip())
     return _HORIZONTAL_WHITESPACE_RE.sub(" ", joined).strip()
+
+
+def _starts_with_lowercase(text: str) -> bool:
+    stripped = text.lstrip()
+    return bool(stripped) and stripped[0].islower()
+
+
+def _should_space_join_page_boundary(
+    current_page: int, current_entry: _BlockEntry, next_page: int, next_entry: _BlockEntry
+) -> bool:
+    if current_entry.kind != "paragraph" or next_entry.kind != "paragraph":
+        return False
+    if next_page != current_page + 1:
+        return False
+    if _MID_SENTENCE_CONTINUATION_RE.search(current_entry.text.rstrip()):
+        return False
+    return _starts_with_lowercase(next_entry.text)
 
 
 def _split_into_blocks(
@@ -134,7 +153,7 @@ def _split_into_blocks(
             continue
 
         if is_table_row_candidate(line):
-            table, next_index = parse_table_region(lines, index)
+            table, next_index = parse_table_region(lines, index, noise_line_indices=noise_line_indices)
             if table is not None:
                 flush_paragraph()
                 flush_list()
@@ -166,10 +185,10 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
     merged block.
 
     Spans are computed strictly after block text assembly: every block's final text is
-    decided first, full_text is rendered by joining them with "\\n\\n", and only then are
-    start_char/end_char derived from that same join structure (cumulative length, not a
-    text search) - so a repeated block's offsets can never be misattributed to an
-    earlier duplicate occurrence.
+    decided first, full_text is rendered by joining them with its actual per-boundary
+    delimiter, and only then are start_char/end_char derived from that same join
+    structure (cumulative length, not a text search) - so a repeated block's offsets
+    can never be misattributed to an earlier duplicate occurrence.
     """
     preprocessed_pages = [_preprocess_text(page.text) for page in document.pages]
     page_line_lists = [text.split("\n") for text in preprocessed_pages]
@@ -180,7 +199,17 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
         for entry in _split_into_blocks(preprocessed, noise_line_indices=noise_line_indices):
             entries.append((page.page_number, entry))
 
-    full_text = "\n\n".join(entry.text for _, entry in entries)
+    delimiters: list[str] = []
+    for index, (page_number, entry) in enumerate(entries[:-1]):
+        next_page_number, next_entry = entries[index + 1]
+        if _should_space_join_page_boundary(page_number, entry, next_page_number, next_entry):
+            delimiters.append(" ")
+        else:
+            delimiters.append("\n\n")
+
+    full_text = "".join(
+        entry.text + (delimiters[index] if index < len(delimiters) else "") for index, (_, entry) in enumerate(entries)
+    )
 
     blocks: list[HeadingBlock | ParagraphBlock | ListBlock | TableBlock | PageHeaderBlock | PageFooterBlock] = []
     cursor = 0
@@ -222,6 +251,9 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
             )
         else:
             blocks.append(ParagraphBlock(block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end))
-        cursor = end + 2  # skip the "\n\n" delimiter before the next block
+        if index < len(delimiters):
+            cursor = end + len(delimiters[index])
+        else:
+            cursor = end
 
     return StructuredNormalizedDocument(document_id=document.document_id, full_text=full_text, blocks=blocks)

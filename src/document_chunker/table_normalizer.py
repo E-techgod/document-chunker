@@ -119,7 +119,7 @@ class TableNormalizer:
         end_index: int,
         header_values: list[str],
         column_starts: list[int],
-    ) -> tuple[list[list[str]], int]:
+    ) -> tuple[list[list[str]], list[bool], int]:
         """Walk the table's physical lines, merging wrapped cell lines into the row
         currently open and emitting a complete logical row each time a line shows evidence
         of a new first-column value (a segment positioned at column 0, plus - when the
@@ -135,6 +135,7 @@ class TableNormalizer:
         """
         expected_columns = len(header_values)
         rows: list[list[str]] = [header_values]
+        row_uses_pipe_delimiter: list[bool] = ["|" in lines[start_index].raw_text]
         row_index = start_index + 1
         active_column_starts = column_starts
 
@@ -158,6 +159,7 @@ class TableNormalizer:
                 )
                 if len(row) >= 2:
                     rows.append(row)
+                    row_uses_pipe_delimiter.append("|" in line.raw_text)
                     row_index += 1
                     if len(segments) == len(row):
                         active_column_starts = [offset for offset, _ in segments]
@@ -185,7 +187,7 @@ class TableNormalizer:
             self._merge_by_position(rows[-1], line, active_column_starts)
             row_index += 1
 
-        return rows, row_index
+        return rows, row_uses_pipe_delimiter, row_index
 
     def _merge_by_position(self, row: list[str], line: ClassifiedLine, column_starts: list[int]) -> None:
         """Append each of `line`'s segments into the cell of `row` whose column start is
@@ -212,7 +214,7 @@ class TableNormalizer:
 
         end_index = self.collect_region(lines, start_index)
         column_starts = self.infer_column_starts(lines[start_index])
-        rows, consumed_index = self.reconstruct_rows(lines, start_index, end_index, header_values, column_starts)
+        rows, _, consumed_index = self.reconstruct_rows(lines, start_index, end_index, header_values, column_starts)
 
         if len(rows) < 2:
             return None, start_index
@@ -224,3 +226,31 @@ class TableNormalizer:
 
         table = NormalizedTable(header=header, rows=body)
         return NormalizedBlock(block_type="table", table=table), consumed_index
+
+    def build_with_row_delimiter_flags(
+        self, lines: list[ClassifiedLine], start_index: int
+    ) -> tuple[NormalizedBlock | None, int, list[bool]]:
+        """Like build(), but also returns a per-body-row flag indicating whether the
+        row started from a physical source line containing literal pipe delimiters."""
+        header_values = self.detect_header(lines, start_index)
+        if len(header_values) < 2:
+            return None, start_index, []
+
+        end_index = self.collect_region(lines, start_index)
+        column_starts = self.infer_column_starts(lines[start_index])
+        rows, row_uses_pipe_delimiter, consumed_index = self.reconstruct_rows(
+            lines, start_index, end_index, header_values, column_starts
+        )
+
+        if len(rows) < 2:
+            return None, start_index, []
+
+        if _looks_like_header_row(rows[0], rows[1:]):
+            header, body = rows[0], rows[1:]
+            body_row_uses_pipe_delimiter = row_uses_pipe_delimiter[1:]
+        else:
+            header, body = [], rows
+            body_row_uses_pipe_delimiter = row_uses_pipe_delimiter
+
+        table = NormalizedTable(header=header, rows=body)
+        return NormalizedBlock(block_type="table", table=table), consumed_index, body_row_uses_pipe_delimiter

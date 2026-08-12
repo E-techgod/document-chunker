@@ -91,6 +91,24 @@ def test_page_with_only_noise_becomes_empty_page():
         assert page.blocks == []
 
 
+def test_bridge_space_joins_mid_sentence_page_break_after_noise_filtering():
+    document = _document(["You will be a competitive candidate in 12", "months.\n\nSTEP 1"])
+    structured = build_structured_document(document)
+
+    normalized = to_normalized_document(document, structured)
+
+    assert normalized.full_text == "You will be a competitive candidate in 12 months.\n\nSTEP 1"
+
+
+def test_bridge_keeps_double_newline_for_intentional_page_break():
+    document = _document(["This paragraph is complete.", "Another paragraph starts here."])
+    structured = build_structured_document(document)
+
+    normalized = to_normalized_document(document, structured)
+
+    assert normalized.full_text == "This paragraph is complete.\n\nAnother paragraph starts here."
+
+
 # --- block-type mapping ---
 
 

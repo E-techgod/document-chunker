@@ -28,6 +28,10 @@ def test_more_dotted_segments_increase_the_level():
     assert detect_heading_level("Section 4.1.2") == 3
 
 
+def test_short_standalone_all_caps_section_title_is_a_heading():
+    assert detect_heading_level("YOUR STRUCTURAL ADVANTAGE") == 2
+
+
 # --- rejection of false positives ---
 
 

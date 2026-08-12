@@ -64,6 +64,25 @@ def test_non_table_region_returns_none():
     assert consumed == 0
 
 
+def test_table_region_stops_before_noise_flagged_footer_line():
+    lines = [
+        "Step | Window | Hours",
+        "1 | Week 1–2 | 5–10 hours total",
+        "baswe.Ai Engineer Accelerator™ | Page 6",
+        "Pull 10–15 real job descriptions.",
+    ]
+
+    result, consumed = parse_table_region(lines, 0, noise_line_indices={2: "page_footer"})
+
+    assert result is not None
+    columns, rows, text = result
+    assert columns == ["Step", "Window", "Hours"]
+    assert rows == [["1", "Week 1–2", "5–10 hours total"]]
+    assert consumed == 2
+    assert "baswe.Ai Engineer Accelerator" not in text
+    assert all("baswe.Ai Engineer Accelerator" not in cell for row in rows for cell in row)
+
+
 # --- row rectangularity (Phase 5 requirement) ---
 
 
@@ -89,6 +108,21 @@ def test_overlong_row_folds_extra_cells_into_the_last_column_without_losing_data
     assert columns == ["Name", "Role"]
     assert all(len(row) == len(columns) for row in rows)
     assert rows[0] == ["Ana", "Engineer Remote"]
+
+
+def test_pipe_delimited_overlong_row_preserves_literal_pipes_when_folded():
+    lines = [
+        "Leverage Play | domain knowledge",
+        "Updated June 2026 | baswe.Ai Engineer Accelerator™ | BASWE LLC",
+        "Reference | 55",
+    ]
+
+    result, _ = parse_table_region(lines, 0)
+
+    columns, rows, _ = result
+    assert columns == ["Leverage Play", "domain knowledge"]
+    assert all(len(row) == len(columns) for row in rows)
+    assert rows[0] == ["Updated June 2026", "baswe.Ai Engineer Accelerator™ | BASWE LLC"]
 
 
 # --- Golden Row Assertions against real BAWSE.pdf tables ---
