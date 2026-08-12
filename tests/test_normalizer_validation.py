@@ -45,16 +45,16 @@ def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:
 
 MULTI_PAGE_MIXED_DOCUMENT = _document(
     [
-        "CHAPTER 01\n"
+        ("CHAPTER 01\n"
         "This is an opening paragraph with some\nwrapped content across lines.\n"
         "- First bullet item\n"
         "- Second bullet item that\n  wraps onto another line\n"
         "Week 5: A Real Heading\n"
         "Name  Role  Score\n"
         "Ana  Engineer  98\n"
-        "Bob  Analyst  91\n",
-        "STEP 2\n"
-        "A closing paragraph on the second page\nthat also wraps across lines.\n",
+        "Bob  Analyst  91\n"),
+        ("STEP 2\n"
+        "A closing paragraph on the second page\nthat also wraps across lines.\n"),
     ]
 )
 
@@ -162,21 +162,21 @@ def test_noise_flagged_footer_is_emitted_separately_not_embedded_in_table_text()
     footer = "baswe.Ai Engineer Accelerator™ | Page 6"
     document = _document(
         [
-            "STEP 1\n"
+            ("STEP 1\n"
             "Step | Window | Hours\n"
             "1 | Week 1–2 | 5–10 hours total\n"
             f"{footer}\n"
-            "Pull 10–15 real job descriptions.",
-            "STEP 2\n"
+            "Pull 10–15 real job descriptions."),
+            ("STEP 2\n"
             "Step | Window | Hours\n"
             "2 | Month 1–2 | 6–8 hrs/week\n"
             f"{footer}\n"
-            "Build the mathematical foundation.",
-            "STEP 3\n"
+            "Build the mathematical foundation."),
+            ("STEP 3\n"
             "Step | Window | Hours\n"
             "3 | Months 3–4 | 8–10 hrs/week\n"
             f"{footer}\n"
-            "Ship a portfolio project.",
+            "Ship a portfolio project."),
         ],
         document_id="noise_table_boundary",
     )

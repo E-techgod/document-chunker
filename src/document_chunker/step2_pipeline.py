@@ -1,3 +1,4 @@
+import itertools
 import re
 from collections import Counter
 
@@ -65,7 +66,7 @@ def _check_non_empty_content(blocks: list[NormalizedBlock]) -> list[str]:
 
 def _check_monotonic_order(blocks: list[NormalizedBlock]) -> list[str]:
     issues = []
-    for previous, current in zip(blocks, blocks[1:]):
+    for previous, current in itertools.pairwise(blocks):
         if current.start_char < previous.end_char:
             issues.append(
                 f"{current.block_id}: start_char {current.start_char} is before "

@@ -288,9 +288,9 @@ def test_monotonic_span_ordering_across_interleaved_heading_and_paragraph_blocks
 def test_consecutive_bullet_items_group_into_one_list_block():
     document = _document(
         [
-            "● Learn functions, arguments, return values, scope\n"
+            ("● Learn functions, arguments, return values, scope\n"
             "● Work with lists, dictionaries, tuples, and sets\n"
-            "● Start writing cleaner, reusable code"
+            "● Start writing cleaner, reusable code")
         ]
     )
 
@@ -317,10 +317,10 @@ def test_list_block_text_renders_items_joined_by_newline():
 def test_multi_line_wrapped_bullet_merges_into_one_item():
     document = _document(
         [
-            "    ● Master Git basics: commit, branch, merge, push\n"
+            ("    ● Master Git basics: commit, branch, merge, push\n"
             "    ● Call public REST APIs using\n"
             "      requests and other tools\n"
-            "    ● Push your first project to GitHub"
+            "    ● Push your first project to GitHub")
         ]
     )
 
