@@ -46,7 +46,11 @@ def _is_short_all_caps_heading(stripped: str) -> bool:
         return False
 
     words = stripped.split()
-    max_words = _MAX_ALL_CAPS_WORDS_WITH_DIGIT if _DIGIT_RE.search(stripped) else _MAX_ALL_CAPS_WORDS
+    max_words = (
+        _MAX_ALL_CAPS_WORDS_WITH_DIGIT
+        if _DIGIT_RE.search(stripped)
+        else _MAX_ALL_CAPS_WORDS
+    )
     if not (_MIN_ALL_CAPS_WORDS <= len(words) <= max_words):
         return False
 

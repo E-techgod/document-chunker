@@ -4,7 +4,12 @@ from collections import Counter
 from document_chunker.list_detector import match_list_item
 from document_chunker.paragraph_normalizer import build_structured_document
 from document_chunker.schemas import ExtractedDocument
-from document_chunker.structured_models import ListBlock, NormalizedBlock, StructuredNormalizedDocument, TableBlock
+from document_chunker.structured_models import (
+    ListBlock,
+    NormalizedBlock,
+    StructuredNormalizedDocument,
+    TableBlock,
+)
 
 # Phase 6/7 of the Step 2 "Normalize + Preserve Structure" redesign: the main pipeline
 # orchestrator. Canonical text assembly and offset assignment (Phase 6) already happen
@@ -51,7 +56,11 @@ def validate_structured_document(
 
 
 def _check_non_empty_content(blocks: list[NormalizedBlock]) -> list[str]:
-    return [f"{b.block_id}: text is empty or whitespace-only" for b in blocks if not b.text.strip()]
+    return [
+        f"{b.block_id}: text is empty or whitespace-only"
+        for b in blocks
+        if not b.text.strip()
+    ]
 
 
 def _check_monotonic_order(blocks: list[NormalizedBlock]) -> list[str]:
@@ -73,7 +82,9 @@ def _check_table_rectangularity(blocks: list[NormalizedBlock]) -> list[str]:
         expected = len(block.columns)
         for index, row in enumerate(block.rows):
             if len(row) != expected:
-                issues.append(f"{block.block_id}: row {index} has {len(row)} cells, expected {expected}")
+                issues.append(
+                    f"{block.block_id}: row {index} has {len(row)} cells, expected {expected}"
+                )
     return issues
 
 
@@ -87,7 +98,9 @@ def _check_list_non_emptiness(blocks: list[NormalizedBlock]) -> list[str]:
             continue
         for index, item in enumerate(block.items):
             if not item.strip():
-                issues.append(f"{block.block_id}: item {index} is empty or whitespace-only")
+                issues.append(
+                    f"{block.block_id}: item {index} is empty or whitespace-only"
+                )
     return issues
 
 
@@ -142,11 +155,17 @@ def _actual_structured_tokens(structured: StructuredNormalizedDocument) -> Count
     return tokens
 
 
-def _check_lossless_content(document: ExtractedDocument, structured: StructuredNormalizedDocument) -> list[str]:
+def _check_lossless_content(
+    document: ExtractedDocument, structured: StructuredNormalizedDocument
+) -> list[str]:
     expected = _expected_source_tokens(document)
     actual = _actual_structured_tokens(structured)
     missing = expected - actual
     if not missing:
         return []
-    sample = ", ".join(f"{token!r}x{count}" for token, count in list(missing.items())[:10])
-    return [f"content lost during normalization: {sum(missing.values())} token(s) missing, e.g. {sample}"]
+    sample = ", ".join(
+        f"{token!r}x{count}" for token, count in list(missing.items())[:10]
+    )
+    return [
+        f"content lost during normalization: {sum(missing.values())} token(s) missing, e.g. {sample}"
+    ]

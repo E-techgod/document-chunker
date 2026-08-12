@@ -1,6 +1,6 @@
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 # Phase 1 data models for the Step 2 "Normalize + Preserve Structure" redesign.
 #
@@ -71,7 +71,7 @@ class TableBlock(NormalizedBlock):
 
 
 AnyBlock = Annotated[
-    Union[HeadingBlock, ParagraphBlock, ListBlock, TableBlock, PageHeaderBlock, PageFooterBlock],
+    HeadingBlock | ParagraphBlock | ListBlock | TableBlock | PageHeaderBlock | PageFooterBlock,
     Field(discriminator="type"),
 ]
 
@@ -84,7 +84,7 @@ class StructuredNormalizedDocument(BaseModel):
     blocks: list[AnyBlock] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _check_unique_block_ids(self) -> "StructuredNormalizedDocument":
+    def _check_unique_block_ids(self) -> StructuredNormalizedDocument:
         seen: set[str] = set()
         for block in self.blocks:
             if block.block_id in seen:

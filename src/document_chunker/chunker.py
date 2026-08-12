@@ -48,7 +48,9 @@ def _compute_page_spans(document: NormalizedDocument) -> list[tuple[int, int, in
     return spans
 
 
-def _page_numbers_for_span(spans: list[tuple[int, int, int]], start_char: int, end_char: int) -> list[int]:
+def _page_numbers_for_span(
+    spans: list[tuple[int, int, int]], start_char: int, end_char: int
+) -> list[int]:
     return [
         page_number
         for page_number, page_start, page_end in spans
@@ -56,7 +58,9 @@ def _page_numbers_for_span(spans: list[tuple[int, int, int]], start_char: int, e
     ]
 
 
-def _iter_char_spans(text: str, max_chunk_size: int, overlap_size: int) -> Iterator[tuple[int, int]]:
+def _iter_char_spans(
+    text: str, max_chunk_size: int, overlap_size: int
+) -> Iterator[tuple[int, int]]:
     step = max_chunk_size - overlap_size
     if step <= 0:
         raise ValueError("overlap_size must be smaller than max_chunk_size")
@@ -126,7 +130,9 @@ def _flatten_elements(
             yield start, end
 
 
-def _pack_elements(pieces: Iterator[tuple[int, int]], max_chunk_size: int) -> Iterator[tuple[int, int]]:
+def _pack_elements(
+    pieces: Iterator[tuple[int, int]], max_chunk_size: int
+) -> Iterator[tuple[int, int]]:
     current_start: int | None = None
     current_end: int | None = None
 
@@ -154,23 +160,37 @@ def structural_elements(document: NormalizedDocument) -> list[tuple[int, int]]:
     ]
 
 
-def document_structural_units(document: NormalizedDocument) -> list[tuple[int, int, str]]:
+def document_structural_units(
+    document: NormalizedDocument,
+) -> list[tuple[int, int, str]]:
     """Document-order (start, end, block_type) triples for every atomic structural unit
     (heading, paragraph, list item, table row) in `document.full_text` - the same units
     structural_elements() exposes as bare spans, with the block type kept alongside so
     callers (e.g. chunk-quality scoring) can tell a split list item from a split table
     row from a split word inside a paragraph."""
-    return [(unit.start, unit.end, unit.block_type) for unit in _document_units(document)]
+    return [
+        (unit.start, unit.end, unit.block_type) for unit in _document_units(document)
+    ]
 
 
-def structural_pieces(document: NormalizedDocument, max_chunk_size: int) -> list[tuple[int, int]]:
+def structural_pieces(
+    document: NormalizedDocument, max_chunk_size: int
+) -> list[tuple[int, int]]:
     """structural_elements(), with any element longer than max_chunk_size further split at
     sentence boundaries. These are the exact units chunk_document packs into chunks."""
-    return list(_flatten_elements(iter(structural_elements(document)), max_chunk_size, document.full_text))
+    return list(
+        _flatten_elements(
+            iter(structural_elements(document)), max_chunk_size, document.full_text
+        )
+    )
 
 
-def _iter_structural_spans(document: NormalizedDocument, max_chunk_size: int) -> Iterator[tuple[int, int]]:
-    yield from _pack_elements(iter(structural_pieces(document, max_chunk_size)), max_chunk_size)
+def _iter_structural_spans(
+    document: NormalizedDocument, max_chunk_size: int
+) -> Iterator[tuple[int, int]]:
+    yield from _pack_elements(
+        iter(structural_pieces(document, max_chunk_size)), max_chunk_size
+    )
 
 
 def _document_units(document: NormalizedDocument) -> list[_Unit]:
@@ -201,7 +221,11 @@ def _document_units(document: NormalizedDocument) -> list[_Unit]:
                 annotated.append(replace(unit, heading_text=current_heading))
             else:
                 annotated.append(
-                    replace(unit, heading_text=current_heading, table_header_text=current_table_header)
+                    replace(
+                        unit,
+                        heading_text=current_heading,
+                        table_header_text=current_table_header,
+                    )
                 )
         else:
             annotated.append(replace(unit, heading_text=current_heading))
@@ -209,7 +233,9 @@ def _document_units(document: NormalizedDocument) -> list[_Unit]:
     return annotated
 
 
-def _flatten_units(units: Iterator[_Unit], max_chunk_size: int, text: str) -> Iterator[_Unit]:
+def _flatten_units(
+    units: Iterator[_Unit], max_chunk_size: int, text: str
+) -> Iterator[_Unit]:
     for unit in units:
         if unit.end - unit.start > max_chunk_size:
             for start, end in _split_into_sentences(unit.start, unit.end, text):
@@ -218,7 +244,9 @@ def _flatten_units(units: Iterator[_Unit], max_chunk_size: int, text: str) -> It
             yield unit
 
 
-def _resolve_context_prefix(unit: _Unit, previous_unit: _Unit | None, full_text: str) -> str:
+def _resolve_context_prefix(
+    unit: _Unit, previous_unit: _Unit | None, full_text: str
+) -> str:
     """The context needed for `unit` to make sense as the first thing in a chunk: nothing if
     it's a heading (it opens fresh); otherwise its governing heading, plus its table's header
     row if it continues a table, falling back to the previous chunk's last unit only when no
@@ -227,7 +255,11 @@ def _resolve_context_prefix(unit: _Unit, previous_unit: _Unit | None, full_text:
         return ""
 
     parts = [unit.heading_text] if unit.heading_text else []
-    if unit.block_type == "table" and unit.table_header_text and not unit.is_table_header_row:
+    if (
+        unit.block_type == "table"
+        and unit.table_header_text
+        and not unit.is_table_header_row
+    ):
         parts.append(unit.table_header_text)
     if not parts and previous_unit is not None:
         parts.append(full_text[previous_unit.start : previous_unit.end])
@@ -235,7 +267,11 @@ def _resolve_context_prefix(unit: _Unit, previous_unit: _Unit | None, full_text:
 
 
 def _pack_table_run(
-    units: list[_Unit], start_index: int, max_chunk_size: int, full_text: str, previous_unit: _Unit | None
+    units: list[_Unit],
+    start_index: int,
+    max_chunk_size: int,
+    full_text: str,
+    previous_unit: _Unit | None,
 ) -> tuple[list[tuple[int, int, str]], int, _Unit | None]:
     """State machine for a contiguous run of table units (a header row, if any, followed by
     its data rows - `unit.table_header_text` already carries the header across a page-break
@@ -257,11 +293,20 @@ def _pack_table_run(
 
         current_start, current_end = leading.start, leading.end
         index += 1
-        while index < len(units) and units[index].block_type == "table" and units[index].end - current_start <= budget:
+        while (
+            index < len(units)
+            and units[index].block_type == "table"
+            and units[index].end - current_start <= budget
+        ):
             current_end = units[index].end
             index += 1
 
-        if leading.is_table_header_row and current_end == leading.end and index < len(units) and units[index].block_type == "table":
+        if (
+            leading.is_table_header_row
+            and current_end == leading.end
+            and index < len(units)
+            and units[index].block_type == "table"
+        ):
             current_end = units[index].end
             index += 1
 
@@ -271,18 +316,24 @@ def _pack_table_run(
     return chunks, index, previous_unit
 
 
-def oversized_table_header_pairs(document: NormalizedDocument, max_chunk_size: int) -> list[tuple[int, int]]:
+def oversized_table_header_pairs(
+    document: NormalizedDocument, max_chunk_size: int
+) -> list[tuple[int, int]]:
     """Spans where a table's header row is forced to share a chunk with its first data row
     even though the pair exceeds max_chunk_size - the header alone couldn't share a chunk
     with even one row, so _pack_table_run pairs it with the next row regardless of size. The
-    evaluator must allow these the same way it already allows a single oversized element."""
+    evaluator must allow these the same way it already allows a single oversized element.
+    """
     units = _document_units(document)
     pairs: list[tuple[int, int]] = []
     for index, unit in enumerate(units):
         if not unit.is_table_header_row:
             continue
         following_index = index + 1
-        if following_index >= len(units) or units[following_index].block_type != "table":
+        if (
+            following_index >= len(units)
+            or units[following_index].block_type != "table"
+        ):
             continue
         following = units[following_index]
         if following.end - unit.start > max_chunk_size:
@@ -322,20 +373,36 @@ def _pack_units_with_context(
 def _iter_structural_spans_with_context(
     document: NormalizedDocument, max_chunk_size: int
 ) -> Iterator[tuple[int, int, str]]:
-    units = list(_flatten_units(iter(_document_units(document)), max_chunk_size, document.full_text))
+    units = list(
+        _flatten_units(
+            iter(_document_units(document)), max_chunk_size, document.full_text
+        )
+    )
     yield from _pack_units_with_context(units, max_chunk_size, document.full_text)
 
 
-def chunk_document(document: NormalizedDocument, config: ChunkingConfig | None = None) -> ChunkingResult:
+def chunk_document(
+    document: NormalizedDocument, config: ChunkingConfig | None = None
+) -> ChunkingResult:
     """Chunk a NormalizedDocument's full_text using the configured chunking_strategy."""
     config = config or ChunkingConfig()
     if config.chunking_strategy == DEFAULT_CHUNKING_STRATEGY:
-        spans = ((start, end, "") for start, end in _iter_char_spans(document.full_text, config.max_chunk_size, config.overlap_size))
+        spans = (
+            (start, end, "")
+            for start, end in _iter_char_spans(
+                document.full_text, config.max_chunk_size, config.overlap_size
+            )
+        )
     elif config.chunking_strategy == STRUCTURAL_STRATEGY:
         if config.propagate_context:
             spans = _iter_structural_spans_with_context(document, config.max_chunk_size)
         else:
-            spans = ((start, end, "") for start, end in _iter_structural_spans(document, config.max_chunk_size))
+            spans = (
+                (start, end, "")
+                for start, end in _iter_structural_spans(
+                    document, config.max_chunk_size
+                )
+            )
     else:
         raise ValueError(f"Unsupported chunking_strategy: {config.chunking_strategy}")
 

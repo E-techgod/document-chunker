@@ -4,17 +4,15 @@ from document_chunker.normalizer import (
     normalize_document,
     normalize_page,
     normalize_text,
-    repair_line_wraps
+    repair_line_wraps,
 )
-from document_chunker.schemas import ExtractedPage, NormalizedDocument, NormalizedPage
+from document_chunker.schemas import ExtractedPage, NormalizedDocument
 
 
 # --- normalize_text: one test per rule ---
 def test_repairs_wrapped_sentence() -> None:
     text = "Engineers —\nnot\nresearchers,\nnot\nML\nPhDs."
-    assert repair_line_wraps(text) == (
-        "Engineers — not researchers, not ML PhDs."
-    )
+    assert repair_line_wraps(text) == ("Engineers — not researchers, not ML PhDs.")
 
 
 def test_preserves_paragraph_break() -> None:
@@ -53,17 +51,14 @@ def test_attaches_indented_continuation_lines_to_numbered_list_items() -> None:
         "1. Watching tutorials without building...\n"
         "    on GitHub, you didn't do that week.\n"
     )
-    expected = "1. Watching tutorials without building... on GitHub, you didn't do that week."
+    expected = (
+        "1. Watching tutorials without building... on GitHub, you didn't do that week."
+    )
     assert repair_line_wraps(text) == expected
 
 
 def test_stops_list_continuations_at_structural_boundaries() -> None:
-    text = (
-        "● First item\n"
-        "  continuation text\n"
-        "Next Section:\n"
-        "Paragraph line\n"
-    )
+    text = "● First item\n" "  continuation text\n" "Next Section:\n" "Paragraph line\n"
     expected = "● First item continuation text\n\nNext Section:\nParagraph line"
     assert repair_line_wraps(text) == expected
 
@@ -73,6 +68,7 @@ def test_normalization_is_idempotent() -> None:
     normalized = normalize_text(text)
 
     assert normalize_text(normalized) == normalized
+
 
 def test_normalizes_line_endings():
     assert normalize_text("a\r\nb\rc") == "a b c"
@@ -120,7 +116,7 @@ def test_normalizes_space_around_brackets():
 
 
 def test_removes_invisible_control_characters():
-    assert normalize_text("a​b‌c﻿d­e") == "abcde"
+    assert normalize_text("a\u200bb‌c﻿d­e") == "abcde"
 
 
 def test_normalize_text_empty_string_returns_empty():
@@ -134,7 +130,7 @@ def test_normalize_text_whitespace_only_returns_empty():
 def test_normalize_text_full_pipeline_combined():
     messy = (
         "  Hello World  \r\n"
-        "This\x00 is​ a    test  \r\n"
+        "This\x00 is\u200b a    test  \r\n"
         "\n\n\n\n"
         "Value , here ; and ( spaced )  \r\n"
         "   \n"
@@ -165,8 +161,12 @@ def test_repairs_hard_wrapped_lines_within_a_paragraph():
 
 
 def test_preserves_blank_line_paragraph_breaks_while_repairing_wraps():
-    text = "First paragraph wraps\nacross two lines.\n\nSecond paragraph also\nwraps here."
-    expected = "First paragraph wraps across two lines.\n\nSecond paragraph also wraps here."
+    text = (
+        "First paragraph wraps\nacross two lines.\n\nSecond paragraph also\nwraps here."
+    )
+    expected = (
+        "First paragraph wraps across two lines.\n\nSecond paragraph also wraps here."
+    )
     assert normalize_text(text) == expected
 
 
@@ -183,7 +183,9 @@ def test_does_not_promote_title_cased_clause_to_heading() -> None:
 
 
 def test_numbered_section_label_is_classified_as_heading():
-    page = ExtractedPage(page_number=1, text="Week 4: Git, GitHub & APIs\n\n- Master Git basics")
+    page = ExtractedPage(
+        page_number=1, text="Week 4: Git, GitHub & APIs\n\n- Master Git basics"
+    )
     normalized = normalize_page(page)
 
     assert normalized.blocks[0].block_type == "heading"
@@ -245,7 +247,9 @@ def test_normalize_page_block_offsets_span_list_items_in_order():
 
     list_block = normalized.blocks[0]
     assert list_block.block_type == "list"
-    assert normalized.text[list_block.start_char : list_block.end_char] == "\n".join(list_block.items)
+    assert normalized.text[list_block.start_char : list_block.end_char] == "\n".join(
+        list_block.items
+    )
 
 
 def test_normalize_page_preserves_page_number():
@@ -297,7 +301,9 @@ def test_normalize_document_combines_pages_into_full_text(make_extract_document)
     assert normalized.full_text == "page one\n\npage two"
 
 
-def test_normalize_document_collapses_blank_line_run_from_blank_page_join(make_extract_document):
+def test_normalize_document_collapses_blank_line_run_from_blank_page_join(
+    make_extract_document,
+):
     document = make_extract_document(["page one", "", "page three"])
     normalized = normalize_document(document)
 
@@ -367,7 +373,9 @@ def test_preserves_heading_paragraph_list_and_soft_wrap_boundaries() -> None:
     assert normalize_text(text) == expected
 
 
-def test_preserves_page_local_processing_for_wrapped_lines(make_extract_document) -> None:
+def test_preserves_page_local_processing_for_wrapped_lines(
+    make_extract_document,
+) -> None:
     document = make_extract_document(
         [
             "Page One Heading\nWrapped line\ncontinues here",
@@ -400,7 +408,10 @@ def test_builds_structural_table_representation() -> None:
         ["Ana", "Engineer", "98"],
         ["Bob", "Analyst", "91"],
     ]
-    assert normalized.text == "Name | Role | Score\nAna | Engineer | 98\nBob | Analyst | 91"
+    assert (
+        normalized.text
+        == "Name | Role | Score\nAna | Engineer | 98\nBob | Analyst | 91"
+    )
 
 
 def test_builds_headerless_structural_table_representation() -> None:
@@ -537,7 +548,7 @@ def test_keeps_rows_independent_when_most_cells_are_long_prose() -> None:
             "1         Python, Git & Engineering Basics                 A CLI app pushed to GitHub\n"
             "2         Data, Text & Embeddings Foundations              A semantic search prototype\n"
             "3         Generative AI & Prompt Engineering               An LLM-powered data extractor\n"
-            "4         RAG, Vector Stores & Frameworks                  A \"Chat with your docs\" app\n"
+            '4         RAG, Vector Stores & Frameworks                  A "Chat with your docs" app\n'
             "5         Machine Learning Foundations                     A re-ranker that boosts your RAG\n"
             "6         Agentic Systems, Production &                    A deployed AI product on GitHub\n"
             "          Capstone"
@@ -548,15 +559,24 @@ def test_keeps_rows_independent_when_most_cells_are_long_prose() -> None:
 
     assert normalized.blocks[0].block_type == "table"
     assert normalized.blocks[0].table is not None
-    assert normalized.blocks[0].table.header == ["Month", "Focus", "Build by end of month"]
+    assert normalized.blocks[0].table.header == [
+        "Month",
+        "Focus",
+        "Build by end of month",
+    ]
     assert normalized.blocks[0].table.rows == [
         ["1", "Python, Git & Engineering Basics", "A CLI app pushed to GitHub"],
         ["2", "Data, Text & Embeddings Foundations", "A semantic search prototype"],
         ["3", "Generative AI & Prompt Engineering", "An LLM-powered data extractor"],
-        ["4", "RAG, Vector Stores & Frameworks", "A \"Chat with your docs\" app"],
+        ["4", "RAG, Vector Stores & Frameworks", 'A "Chat with your docs" app'],
         ["5", "Machine Learning Foundations", "A re-ranker that boosts your RAG"],
-        ["6", "Agentic Systems, Production & Capstone", "A deployed AI product on GitHub"],
+        [
+            "6",
+            "Agentic Systems, Production & Capstone",
+            "A deployed AI product on GitHub",
+        ],
     ]
+
 
 def test_appends_wrapped_final_row_when_followed_by_unrelated_text() -> None:
     page = ExtractedPage(
@@ -574,10 +594,16 @@ def test_appends_wrapped_final_row_when_followed_by_unrelated_text() -> None:
     assert normalized.blocks[0].block_type == "table"
     assert normalized.blocks[0].table is not None
     assert normalized.blocks[0].table.rows == [
-        ["6", "Agentic Systems, Production & Capstone", "A deployed AI product on GitHub"],
+        [
+            "6",
+            "Agentic Systems, Production & Capstone",
+            "A deployed AI product on GitHub",
+        ],
     ]
     assert normalized.blocks[1].block_type == "paragraph"
-    assert normalized.blocks[1].text == "Questions? Reach out to your program coordinator."
+    assert (
+        normalized.blocks[1].text == "Questions? Reach out to your program coordinator."
+    )
 
 
 def test_appends_multi_word_wrapped_row_misclassified_as_heading() -> None:
@@ -615,7 +641,11 @@ def test_does_not_merge_genuine_heading_after_complete_table_row() -> None:
     assert normalized.blocks[0].block_type == "table"
     assert normalized.blocks[0].table is not None
     assert normalized.blocks[0].table.rows == [
-        ["6", "Agentic Systems, Production & Capstone", "A deployed AI product on GitHub"],
+        [
+            "6",
+            "Agentic Systems, Production & Capstone",
+            "A deployed AI product on GitHub",
+        ],
     ]
     assert normalized.blocks[1].block_type == "heading"
     assert normalized.blocks[1].text == "Career Services"
@@ -623,11 +653,13 @@ def test_does_not_merge_genuine_heading_after_complete_table_row() -> None:
 
 def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocument):
     """Verify that computed document and page metrics strictly match content lengths."""
-    
+
     # Check Document level
     assert normalized_doc.page_count == len(normalized_doc.pages)
     assert normalized_doc.char_count == len(normalized_doc.full_text)
-    assert normalized_doc.word_count == sum(page.word_count for page in normalized_doc.pages)
+    assert normalized_doc.word_count == sum(
+        page.word_count for page in normalized_doc.pages
+    )
     assert normalized_doc.word_count == count_words(normalized_doc.full_text)
 
     # Check Page level
@@ -636,7 +668,9 @@ def test_normalized_document_metrics_integrity(normalized_doc: NormalizedDocumen
         assert page.word_count == count_words(page.text)
 
 
-def test_json_serialization_includes_computed_fields(normalized_doc: NormalizedDocument):
+def test_json_serialization_includes_computed_fields(
+    normalized_doc: NormalizedDocument,
+):
     """Verify @computed_field fields appear when serialized to JSON/dict."""
     doc_dict = normalized_doc.model_dump()
 
@@ -644,5 +678,5 @@ def test_json_serialization_includes_computed_fields(normalized_doc: NormalizedD
     assert "page_count" in doc_dict
     assert "word_count" in doc_dict
     assert "char_count" in doc_dict
-    
+
     assert doc_dict["page_count"] == len(normalized_doc.pages)

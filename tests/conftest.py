@@ -2,14 +2,21 @@ import pytest
 from pypdf import PdfWriter
 
 from document_chunker.normalizer import normalize_document
-from document_chunker.schemas import ExtractedDocument, ExtractedPage, NormalizedDocument, NormalizedPage
+from document_chunker.schemas import (
+    ExtractedDocument,
+    ExtractedPage,
+    NormalizedDocument,
+    NormalizedPage,
+)
 
 
 @pytest.fixture
 def create_pdf(tmp_path):
     """Helper fixture to dynamically create test PDFs in a temporary folder."""
 
-    def _generator(filename="valid.pdf", pages=1, encrypt_password=None, raw_bytes=None):
+    def _generator(
+        filename="valid.pdf", pages=1, encrypt_password=None, raw_bytes=None
+    ):
         file_path = tmp_path / filename
 
         if raw_bytes is not None:

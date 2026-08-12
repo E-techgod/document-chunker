@@ -84,7 +84,9 @@ def test_table_region_stops_before_noise_flagged_footer_line():
         "Pull 10–15 real job descriptions.",
     ]
 
-    result, consumed = parse_table_region(lines, 0, noise_line_indices={2: "page_footer"})
+    result, consumed = parse_table_region(
+        lines, 0, noise_line_indices={2: "page_footer"}
+    )
 
     assert result is not None
     columns, rows, text = result
@@ -92,7 +94,9 @@ def test_table_region_stops_before_noise_flagged_footer_line():
     assert rows == [["1", "Week 1–2", "5–10 hours total"]]
     assert consumed == 2
     assert "baswe.Ai Engineer Accelerator" not in text
-    assert all("baswe.Ai Engineer Accelerator" not in cell for row in rows for cell in row)
+    assert all(
+        "baswe.Ai Engineer Accelerator" not in cell for row in rows for cell in row
+    )
 
 
 # --- row rectangularity (Phase 5 requirement) ---
@@ -134,7 +138,10 @@ def test_pipe_delimited_overlong_row_preserves_literal_pipes_when_folded():
     columns, rows, _ = result
     assert columns == ["Leverage Play", "domain knowledge"]
     assert all(len(row) == len(columns) for row in rows)
-    assert rows[0] == ["Updated June 2026", "baswe.Ai Engineer Accelerator™ | BASWE LLC"]
+    assert rows[0] == [
+        "Updated June 2026",
+        "baswe.Ai Engineer Accelerator™ | BASWE LLC",
+    ]
 
 
 # --- Golden Row Assertions against real BAWSE.pdf tables ---
@@ -144,7 +151,9 @@ def test_golden_rows_top_industries_table():
     extracted = _extract("BAWSE.pdf")
     structured = build_structured_document(extracted)
     table = next(
-        b for b in structured.blocks if isinstance(b, TableBlock) and any("Technology" in row[0] for row in b.rows)
+        b
+        for b in structured.blocks
+        if isinstance(b, TableBlock) and any("Technology" in row[0] for row in b.rows)
     )
 
     technology_row = next(row for row in table.rows if row[0] == "Technology")
@@ -165,7 +174,9 @@ def test_golden_row_salary_snapshot_table():
     extracted = _extract("BAWSE.pdf")
     structured = build_structured_document(extracted)
     table = next(
-        b for b in structured.blocks if isinstance(b, TableBlock) and any("Junior" in row[0] for row in b.rows)
+        b
+        for b in structured.blocks
+        if isinstance(b, TableBlock) and any("Junior" in row[0] for row in b.rows)
     )
 
     mid_level_row = next(row for row in table.rows if "Mid-Level" in row[0])
@@ -183,7 +194,9 @@ def test_all_rows_rectangular_in_real_tables():
         structured = build_structured_document(extracted)
         for block in structured.blocks:
             if isinstance(block, TableBlock) and block.columns:
-                assert all(len(row) == len(block.columns) for row in block.rows), pdf_name
+                assert all(
+                    len(row) == len(block.columns) for row in block.rows
+                ), pdf_name
 
 
 # --- span integrity and document ordering ---
@@ -211,6 +224,10 @@ def test_table_block_sits_between_surrounding_heading_and_paragraph():
 
     structured = build_structured_document(document)
 
-    assert [type(b).__name__ for b in structured.blocks] == ["HeadingBlock", "TableBlock", "ParagraphBlock"]
+    assert [type(b).__name__ for b in structured.blocks] == [
+        "HeadingBlock",
+        "TableBlock",
+        "ParagraphBlock",
+    ]
     for previous, current in zip(structured.blocks, structured.blocks[1:]):
         assert current.start_char >= previous.end_char

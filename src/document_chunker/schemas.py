@@ -1,13 +1,15 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, field_validator, Field, field_validator, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
+
 from document_chunker.counting import count_words
 
 NormalizationStrategy = Literal[
     "characters",
     "structural",
 ]
+
 
 class PDFDocumentInput(BaseModel):
     """Validated input for loading a single PDF document."""
@@ -20,21 +22,26 @@ class PDFDocumentInput(BaseModel):
     @classmethod
     def validate_path(cls, path: Path) -> Path:
         if not str(path).strip():
-            raise ValueError("path must be provided") # Convert input into Path
+            raise ValueError("path must be provided")  # Convert input into Path
         if not path.exists():
-            raise ValueError(f"path does not exist: {path}") # Check path exists
+            raise ValueError(f"path does not exist: {path}")  # Check path exists
         if not path.is_file():
-            raise ValueError(f"path is not a file: {path}") # Check path is a file
+            raise ValueError(f"path is not a file: {path}")  # Check path is a file
         if path.suffix.lower() != ".pdf":
-            raise ValueError(f"path must point to a .pdf file: {path}") # Check extension is .pdf
+            raise ValueError(
+                f"path must point to a .pdf file: {path}"
+            )  # Check extension is .pdf
         if path.stat().st_size == 0:
-            raise ValueError(f"file is empty: {path}") # Check size is greater than zero
-        return path 
+            raise ValueError(
+                f"file is empty: {path}"
+            )  # Check size is greater than zero
+        return path
+
 
 class ExtractedPage(BaseModel):
     page_number: int = Field(ge=1)
     text: str
-    
+
     @computed_field
     @property
     def word_count(self) -> int:
@@ -44,6 +51,7 @@ class ExtractedPage(BaseModel):
     @property
     def char_count(self) -> int:
         return len(self.text)
+
 
 class ExtractedDocument(BaseModel):
     document_id: str
@@ -68,6 +76,7 @@ class ExtractedDocument(BaseModel):
     def char_count(self) -> int:
         return len(self.full_text)
 
+
 class NormalizedTable(BaseModel):
     header: list[str] = Field(default_factory=list)
     rows: list[list[str]] = Field(default_factory=list)
@@ -83,7 +92,9 @@ class NormalizedBlock(BaseModel):
 
 
 class NormalizedPage(BaseModel):
-    page_number: int  = Field(ge=1) # Field level validation to ensure page_number is greater than or equal to 1
+    page_number: int = Field(
+        ge=1
+    )  # Field level validation to ensure page_number is greater than or equal to 1
     text: str
     blocks: list[NormalizedBlock] = Field(default_factory=list)
 
@@ -97,6 +108,7 @@ class NormalizedPage(BaseModel):
     def char_count(self) -> int:
         return len(self.text)
 
+
 class NormalizedDocument(BaseModel):
     document_id: str
     file_name: str
@@ -105,8 +117,8 @@ class NormalizedDocument(BaseModel):
     pages: list[NormalizedPage]
     full_text: str
     normalized_strategy: str | None = None
-   
-    @computed_field # Validation to ensure that the page_count is equal to the length of the pages list
+
+    @computed_field  # Validation to ensure that the page_count is equal to the length of the pages list
     @property
     def page_count(self) -> int:
         return len(self.pages)
@@ -121,13 +133,21 @@ class NormalizedDocument(BaseModel):
     def char_count(self) -> int:
         return len(self.full_text)
 
-class ChunkingConfig(BaseModel): # The rules: How to chunk the document into smaller pieces for processing
+
+class ChunkingConfig(
+    BaseModel
+):  # The rules: How to chunk the document into smaller pieces for processing
     max_chunk_size: int = Field(default=1000, ge=1)
     overlap_size: int = Field(default=100, ge=0)
     chunking_strategy: Literal["characters", "structural"] = "characters"
-    propagate_context: bool = False  # structural only, TRUE to activate (v2.2); ignored for "characters"
+    propagate_context: bool = (
+        False  # structural only, TRUE to activate (v2.2); ignored for "characters"
+    )
 
-class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represents a chunk of a document, with metadata and content
+
+class DocumentChunk(
+    BaseModel
+):  # One Chunk: Represents one chunk only: Represents a chunk of a document, with metadata and content
     document_id: str
     chunk_id: str
     chunk_index: int = Field(ge=0)
@@ -142,7 +162,9 @@ class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represen
     @computed_field
     @property
     def contextualized_text(self) -> str:
-        return f"{self.context_prefix}\n{self.text}" if self.context_prefix else self.text
+        return (
+            f"{self.context_prefix}\n{self.text}" if self.context_prefix else self.text
+        )
 
     @field_validator("word_count", "char_count", mode="before")
     @classmethod
@@ -151,7 +173,10 @@ class DocumentChunk(BaseModel): # One Chunk: Represents one chunk only: Represen
             raise ValueError("word_count and char_count must be non-negative")
         return value
 
-class ChunkingResult(BaseModel): # The whole chunking output: Represents the whole document after chunking: Represents the result of chunking a document, with metadata and chunks
+
+class ChunkingResult(
+    BaseModel
+):  # The whole chunking output: Represents the whole document after chunking: Represents the result of chunking a document, with metadata and chunks
     document_id: str
     file_name: str
     file_path: Path
@@ -174,12 +199,18 @@ class ChunkingResult(BaseModel): # The whole chunking output: Represents the who
     def total_char_count(self) -> int:
         return sum(chunk.char_count for chunk in self.chunks)
 
-class ChunkValidationIssue(BaseModel): # One broken invariant, tied to the chunk (if any) where it was found
+
+class ChunkValidationIssue(
+    BaseModel
+):  # One broken invariant, tied to the chunk (if any) where it was found
     invariant: str
     chunk_index: int | None = None
     message: str
 
-class ChunkValidationReport(BaseModel): # The full set of invariant violations found for one ChunkingResult
+
+class ChunkValidationReport(
+    BaseModel
+):  # The full set of invariant violations found for one ChunkingResult
     document_id: str
     issues: list[ChunkValidationIssue] = Field(default_factory=list)
 
@@ -205,11 +236,24 @@ class ChunkQualityReport(BaseModel):
     chunk_count: int = Field(ge=0)
     avg_utilization: float = Field(ge=0)  # mean chunk char_count / max_chunk_size
     tiny_chunk_count: int = Field(default=0, ge=0)
-    tiny_chunk_ratio: float = Field(default=0, ge=0, le=1)  # share of chunks under TINY_CHUNK_RATIO of max size
-    word_splits: int = Field(default=0, ge=0)  # chunk boundaries cutting through a word inside a heading/paragraph
-    bullet_splits: int = Field(default=0, ge=0)  # chunk boundaries cutting through a list item
-    table_row_splits: int = Field(default=0, ge=0)  # chunk boundaries cutting through a table row
-    context_overhead: float = Field(default=0, ge=0)  # redundant chars (overlap or context_prefix) / total chars
-    overhead_source: OverheadSource = "none"  # which mechanism produced context_overhead, for display
-    context_coverage: float | None = Field(default=None, ge=0, le=1)  # None when propagate_context is off (N/A)
-
+    tiny_chunk_ratio: float = Field(
+        default=0, ge=0, le=1
+    )  # share of chunks under TINY_CHUNK_RATIO of max size
+    word_splits: int = Field(
+        default=0, ge=0
+    )  # chunk boundaries cutting through a word inside a heading/paragraph
+    bullet_splits: int = Field(
+        default=0, ge=0
+    )  # chunk boundaries cutting through a list item
+    table_row_splits: int = Field(
+        default=0, ge=0
+    )  # chunk boundaries cutting through a table row
+    context_overhead: float = Field(
+        default=0, ge=0
+    )  # redundant chars (overlap or context_prefix) / total chars
+    overhead_source: OverheadSource = (
+        "none"  # which mechanism produced context_overhead, for display
+    )
+    context_coverage: float | None = Field(
+        default=None, ge=0, le=1
+    )  # None when propagate_context is off (N/A)

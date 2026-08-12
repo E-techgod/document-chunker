@@ -8,7 +8,12 @@ from document_chunker.evaluator import validate_chunks
 from document_chunker.extractor import extract_pdf
 from document_chunker.loader import load_pdf
 from document_chunker.paragraph_normalizer import build_structured_document
-from document_chunker.schemas import ChunkingConfig, ExtractedDocument, ExtractedPage, PDFDocumentInput
+from document_chunker.schemas import (
+    ChunkingConfig,
+    ExtractedDocument,
+    ExtractedPage,
+    PDFDocumentInput,
+)
 from document_chunker.structured_bridge import to_normalized_document
 from document_chunker.structured_models import (
     HeadingBlock,
@@ -24,7 +29,9 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
 def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:
-    pages = [ExtractedPage(page_number=i, text=text) for i, text in enumerate(texts, start=1)]
+    pages = [
+        ExtractedPage(page_number=i, text=text) for i, text in enumerate(texts, start=1)
+    ]
     return ExtractedDocument(
         document_id=document_id,
         file_name=f"{document_id}.pdf",
@@ -92,37 +99,67 @@ def test_page_with_only_noise_becomes_empty_page():
 
 
 def test_bridge_space_joins_mid_sentence_page_break_after_noise_filtering():
-    document = _document(["You will be a competitive candidate in 12", "months.\n\nSTEP 1"])
+    document = _document(
+        ["You will be a competitive candidate in 12", "months.\n\nSTEP 1"]
+    )
     structured = build_structured_document(document)
 
     normalized = to_normalized_document(document, structured)
 
-    assert normalized.full_text == "You will be a competitive candidate in 12 months.\n\nSTEP 1"
+    assert (
+        normalized.full_text
+        == "You will be a competitive candidate in 12 months.\n\nSTEP 1"
+    )
 
 
 def test_bridge_keeps_double_newline_for_intentional_page_break():
-    document = _document(["This paragraph is complete.", "Another paragraph starts here."])
+    document = _document(
+        ["This paragraph is complete.", "Another paragraph starts here."]
+    )
     structured = build_structured_document(document)
 
     normalized = to_normalized_document(document, structured)
 
-    assert normalized.full_text == "This paragraph is complete.\n\nAnother paragraph starts here."
+    assert (
+        normalized.full_text
+        == "This paragraph is complete.\n\nAnother paragraph starts here."
+    )
 
 
 # --- block-type mapping ---
 
 
-def _sample_structured_document() -> tuple[ExtractedDocument, StructuredNormalizedDocument]:
+def _sample_structured_document() -> (
+    tuple[ExtractedDocument, StructuredNormalizedDocument]
+):
     document = _document(["placeholder"])
     full_text = "Overview\nSome prose.\nfirst\nsecond\nName | Score\nAna | 98\nRunning Title\nPage 1"
     structured = StructuredNormalizedDocument(
         document_id=document.document_id,
         full_text=full_text,
         blocks=[
-            HeadingBlock(block_id="block_001", text="Overview", page=1, start_char=0, end_char=8, level=1),
-            ParagraphBlock(block_id="block_002", text="Some prose.", page=1, start_char=9, end_char=20),
+            HeadingBlock(
+                block_id="block_001",
+                text="Overview",
+                page=1,
+                start_char=0,
+                end_char=8,
+                level=1,
+            ),
+            ParagraphBlock(
+                block_id="block_002",
+                text="Some prose.",
+                page=1,
+                start_char=9,
+                end_char=20,
+            ),
             ListBlock(
-                block_id="block_003", text="first\nsecond", page=1, start_char=21, end_char=33, items=["first", "second"]
+                block_id="block_003",
+                text="first\nsecond",
+                page=1,
+                start_char=21,
+                end_char=33,
+                items=["first", "second"],
             ),
             TableBlock(
                 block_id="block_004",
@@ -133,8 +170,16 @@ def _sample_structured_document() -> tuple[ExtractedDocument, StructuredNormaliz
                 columns=["Name", "Score"],
                 rows=[["Ana", "98"]],
             ),
-            PageHeaderBlock(block_id="block_005", text="Running Title", page=1, start_char=57, end_char=70),
-            PageFooterBlock(block_id="block_006", text="Page 1", page=1, start_char=71, end_char=77),
+            PageHeaderBlock(
+                block_id="block_005",
+                text="Running Title",
+                page=1,
+                start_char=57,
+                end_char=70,
+            ),
+            PageFooterBlock(
+                block_id="block_006", text="Page 1", page=1, start_char=71, end_char=77
+            ),
         ],
     )
     return document, structured
@@ -161,7 +206,12 @@ def test_chunk_document_and_validate_chunks_succeed_on_bridged_document():
     document = _noisy_document()
     structured = build_structured_document(document)
     normalized = to_normalized_document(document, structured)
-    config = ChunkingConfig(max_chunk_size=1000, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=1000,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(normalized, config=config)
     report = validate_chunks(normalized, result, config)

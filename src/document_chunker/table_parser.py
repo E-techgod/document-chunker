@@ -1,5 +1,9 @@
 from document_chunker.list_detector import match_list_item
-from document_chunker.normalizer import _classify_line, _is_table_candidate, _render_table_block
+from document_chunker.normalizer import (
+    _classify_line,
+    _is_table_candidate,
+    _render_table_block,
+)
 from document_chunker.schemas import NormalizedTable
 from document_chunker.table_normalizer import TableNormalizer
 
@@ -32,7 +36,11 @@ def _collect_table_region(
     noise_line_indices = noise_line_indices or {}
     while end_index < len(lines):
         stripped = lines[end_index].strip()
-        if end_index in noise_line_indices or not stripped or match_list_item(stripped) is not None:
+        if (
+            end_index in noise_line_indices
+            or not stripped
+            or match_list_item(stripped) is not None
+        ):
             break
         end_index += 1
     return end_index
@@ -72,7 +80,9 @@ def parse_table_region(
     text). Returns (None, start_index) if the region doesn't actually hold a valid
     table (mirrors TableNormalizer.build's own None case, e.g. a single unparseable
     line)."""
-    end_index = _collect_table_region(lines, start_index, noise_line_indices=noise_line_indices)
+    end_index = _collect_table_region(
+        lines, start_index, noise_line_indices=noise_line_indices
+    )
     # _classify_line (not a hardcoded "table_row" type) matters here: TableNormalizer's
     # continuation-vs-new-row logic (_looks_like_table_continuation) explicitly treats a
     # line typed "table_row" as never being a mere continuation fragment, so a
@@ -81,13 +91,19 @@ def parse_table_region(
     # gets wrongly rejected instead of merged.
     classified = [_classify_line(line) for line in lines[start_index:end_index]]
 
-    block, consumed, row_uses_pipe_delimiter = TableNormalizer().build_with_row_delimiter_flags(classified, 0)
+    block, consumed, row_uses_pipe_delimiter = (
+        TableNormalizer().build_with_row_delimiter_flags(classified, 0)
+    )
     if block is None or block.table is None:
         return None, start_index
 
     columns = block.table.header
-    overflow_joiners = [" | " if uses_pipe else " " for uses_pipe in row_uses_pipe_delimiter]
-    rows = _rectangularize(block.table.rows, len(columns), overflow_joiners=overflow_joiners)
+    overflow_joiners = [
+        " | " if uses_pipe else " " for uses_pipe in row_uses_pipe_delimiter
+    ]
+    rows = _rectangularize(
+        block.table.rows, len(columns), overflow_joiners=overflow_joiners
+    )
     text = _render_table_block(NormalizedTable(header=columns, rows=rows))
 
     return (columns, rows, text), start_index + consumed

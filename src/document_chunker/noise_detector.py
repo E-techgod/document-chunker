@@ -47,9 +47,13 @@ def _normalize_for_repetition(text: str) -> str:
     return _WHITESPACE_RUN_RE.sub(" ", normalized)
 
 
-def _zone_lines(lines: list[str], zone_size: int) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
+def _zone_lines(
+    lines: list[str], zone_size: int
+) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
     """(index, stripped text) pairs for the first/last `zone_size` non-blank lines."""
-    non_blank = [(index, line.strip()) for index, line in enumerate(lines) if line.strip()]
+    non_blank = [
+        (index, line.strip()) for index, line in enumerate(lines) if line.strip()
+    ]
     return non_blank[:zone_size], non_blank[-zone_size:]
 
 

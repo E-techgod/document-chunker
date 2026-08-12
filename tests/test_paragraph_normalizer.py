@@ -13,7 +13,9 @@ from document_chunker.structured_models import (
 
 
 def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:
-    pages = [ExtractedPage(page_number=i, text=text) for i, text in enumerate(texts, start=1)]
+    pages = [
+        ExtractedPage(page_number=i, text=text) for i, text in enumerate(texts, start=1)
+    ]
     return ExtractedDocument(
         document_id=document_id,
         file_name=f"{document_id}.pdf",
@@ -71,7 +73,10 @@ def test_blank_line_starts_a_new_paragraph_block():
 
     structured = build_structured_document(document)
 
-    assert [b.text for b in structured.blocks] == ["First paragraph.", "Second paragraph."]
+    assert [b.text for b in structured.blocks] == [
+        "First paragraph.",
+        "Second paragraph.",
+    ]
     assert all(isinstance(b, ParagraphBlock) for b in structured.blocks)
 
 
@@ -88,29 +93,46 @@ def test_page_boundary_always_starts_a_new_paragraph_even_without_a_blank_line()
 
     structured = build_structured_document(document)
 
-    assert [b.text for b in structured.blocks] == ["First page ends mid", "sentence on next page."]
+    assert [b.text for b in structured.blocks] == [
+        "First page ends mid",
+        "sentence on next page.",
+    ]
     assert [b.page for b in structured.blocks] == [1, 2]
 
 
 def test_mid_sentence_page_break_between_paragraph_blocks_renders_with_space_and_keeps_spans():
-    document = _document(["You will be a competitive candidate in 12", "months.\n\nSTEP 1"])
+    document = _document(
+        ["You will be a competitive candidate in 12", "months.\n\nSTEP 1"]
+    )
 
     structured = build_structured_document(document)
 
-    assert structured.full_text == "You will be a competitive candidate in 12 months.\n\nSTEP 1"
+    assert (
+        structured.full_text
+        == "You will be a competitive candidate in 12 months.\n\nSTEP 1"
+    )
     assert [b.page for b in structured.blocks] == [1, 2, 2]
-    assert [type(b).__name__ for b in structured.blocks] == ["ParagraphBlock", "ParagraphBlock", "HeadingBlock"]
+    assert [type(b).__name__ for b in structured.blocks] == [
+        "ParagraphBlock",
+        "ParagraphBlock",
+        "HeadingBlock",
+    ]
     for block in structured.blocks:
         assert structured.full_text[block.start_char : block.end_char] == block.text
     assert validate_structured_document(structured, source=document) == []
 
 
 def test_page_boundary_keeps_double_newline_for_intentional_paragraph_break():
-    document = _document(["This paragraph is complete.", "Another paragraph starts here."])
+    document = _document(
+        ["This paragraph is complete.", "Another paragraph starts here."]
+    )
 
     structured = build_structured_document(document)
 
-    assert structured.full_text == "This paragraph is complete.\n\nAnother paragraph starts here."
+    assert (
+        structured.full_text
+        == "This paragraph is complete.\n\nAnother paragraph starts here."
+    )
     assert [b.page for b in structured.blocks] == [1, 2]
 
 
@@ -167,7 +189,11 @@ def test_block_ids_are_unique_and_sequential():
 
     structured = build_structured_document(document)
 
-    assert [b.block_id for b in structured.blocks] == ["block_001", "block_002", "block_003"]
+    assert [b.block_id for b in structured.blocks] == [
+        "block_001",
+        "block_002",
+        "block_003",
+    ]
 
 
 # --- heading detection and interleaving (Phase 3) ---
@@ -200,13 +226,17 @@ def test_heading_and_paragraphs_interleave_in_document_order():
 
 def test_heading_false_positive_stays_a_paragraph_block():
     document = _document(
-        ["CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND\n\nOver 75% of AI job listings seek domain experts."]
+        [
+            "CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND\n\nOver 75% of AI job listings seek domain experts."
+        ]
     )
 
     structured = build_structured_document(document)
 
     assert isinstance(structured.blocks[0], ParagraphBlock)
-    assert structured.blocks[0].text == "CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND"
+    assert (
+        structured.blocks[0].text == "CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND"
+    )
 
 
 def test_wrapped_multi_line_chunk_with_numbered_prefix_stays_a_paragraph_not_a_heading():
@@ -217,7 +247,10 @@ def test_wrapped_multi_line_chunk_with_numbered_prefix_stays_a_paragraph_not_a_h
     structured = build_structured_document(document)
 
     assert isinstance(structured.blocks[0], ParagraphBlock)
-    assert structured.blocks[0].text == "Week 2 was really hard for most students in the cohort."
+    assert (
+        structured.blocks[0].text
+        == "Week 2 was really hard for most students in the cohort."
+    )
 
 
 def test_span_invariant_holds_across_interleaved_heading_and_paragraph_blocks():
@@ -307,17 +340,26 @@ def test_list_terminates_on_blank_line_before_a_paragraph():
 
     structured = build_structured_document(document)
 
-    assert [type(b).__name__ for b in structured.blocks] == ["ListBlock", "ParagraphBlock"]
+    assert [type(b).__name__ for b in structured.blocks] == [
+        "ListBlock",
+        "ParagraphBlock",
+    ]
     assert structured.blocks[0].items == ["First item", "Second item"]
     assert structured.blocks[1].text == "A normal paragraph follows."
 
 
 def test_list_terminates_on_a_new_heading():
-    document = _document(["- First item\n- Second item\nSTEP 3\n- Third item\n- Fourth item"])
+    document = _document(
+        ["- First item\n- Second item\nSTEP 3\n- Third item\n- Fourth item"]
+    )
 
     structured = build_structured_document(document)
 
-    assert [type(b).__name__ for b in structured.blocks] == ["ListBlock", "HeadingBlock", "ListBlock"]
+    assert [type(b).__name__ for b in structured.blocks] == [
+        "ListBlock",
+        "HeadingBlock",
+        "ListBlock",
+    ]
     assert structured.blocks[0].items == ["First item", "Second item"]
     assert structured.blocks[2].items == ["Third item", "Fourth item"]
 
@@ -325,22 +367,35 @@ def test_list_terminates_on_a_new_heading():
 def test_list_terminates_on_a_non_continuation_paragraph_line_without_a_blank_line():
     # A plain line with no marker and no deeper indent than the last item's marker ends
     # the list and starts a paragraph, even without a blank line in between.
-    document = _document(["    - First item\n    - Second item\nA paragraph starts right here."])
+    document = _document(
+        ["    - First item\n    - Second item\nA paragraph starts right here."]
+    )
 
     structured = build_structured_document(document)
 
-    assert [type(b).__name__ for b in structured.blocks] == ["ListBlock", "ParagraphBlock"]
+    assert [type(b).__name__ for b in structured.blocks] == [
+        "ListBlock",
+        "ParagraphBlock",
+    ]
     assert structured.blocks[1].text == "A paragraph starts right here."
 
 
 def test_preceding_heading_stays_a_separate_block_from_the_list():
-    document = _document(["Week 4: Git, GitHub & APIs\n- Master Git basics\n- Push your first project"])
+    document = _document(
+        ["Week 4: Git, GitHub & APIs\n- Master Git basics\n- Push your first project"]
+    )
 
     structured = build_structured_document(document)
 
-    assert [type(b).__name__ for b in structured.blocks] == ["HeadingBlock", "ListBlock"]
+    assert [type(b).__name__ for b in structured.blocks] == [
+        "HeadingBlock",
+        "ListBlock",
+    ]
     assert structured.blocks[0].text == "Week 4: Git, GitHub & APIs"
-    assert structured.blocks[1].items == ["Master Git basics", "Push your first project"]
+    assert structured.blocks[1].items == [
+        "Master Git basics",
+        "Push your first project",
+    ]
 
 
 def test_span_invariant_holds_for_list_blocks():
@@ -393,7 +448,9 @@ def test_no_non_whitespace_content_is_dropped_during_line_joining():
 
     structured = build_structured_document(document)
 
-    assert _non_whitespace_tokens(structured.full_text) == _non_whitespace_tokens(raw_text)
+    assert _non_whitespace_tokens(structured.full_text) == _non_whitespace_tokens(
+        raw_text
+    )
 
 
 def test_no_content_dropped_across_multiple_pages_with_blank_page():
@@ -406,7 +463,9 @@ def test_no_content_dropped_across_multiple_pages_with_blank_page():
 
     structured = build_structured_document(document)
 
-    expected_tokens = [tok for page in raw_pages for tok in _non_whitespace_tokens(page)]
+    expected_tokens = [
+        tok for page in raw_pages for tok in _non_whitespace_tokens(page)
+    ]
     assert _non_whitespace_tokens(structured.full_text) == expected_tokens
 
 
@@ -455,7 +514,9 @@ def test_content_blocks_excludes_noise_but_keeps_body_paragraphs():
 
     structured = build_structured_document(document)
 
-    assert [type(b).__name__ for b in structured.content_blocks] == ["ParagraphBlock"] * 3
+    assert [type(b).__name__ for b in structured.content_blocks] == [
+        "ParagraphBlock"
+    ] * 3
     assert [b.text for b in structured.content_blocks] == [
         "Unique subtitle one This is body content unique to page one with real prose that should stay intact.",
         "Unique subtitle two This is body content unique to page two with real prose that should stay intact.",

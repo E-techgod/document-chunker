@@ -1,9 +1,17 @@
 import re
 
-from document_chunker.normalizer import _EXCESS_BLANK_LINES_RE, BlockEntry, _render_blocks
-from document_chunker.schemas import ExtractedDocument
+from document_chunker.normalizer import (
+    _EXCESS_BLANK_LINES_RE,
+    BlockEntry,
+    _render_blocks,
+)
+from document_chunker.schemas import (
+    ExtractedDocument,
+    NormalizedDocument,
+    NormalizedPage,
+    NormalizedTable,
+)
 from document_chunker.schemas import NormalizedBlock as SchemaBlock
-from document_chunker.schemas import NormalizedDocument, NormalizedPage, NormalizedTable
 from document_chunker.structured_models import (
     AnyBlock,
     HeadingBlock,
@@ -48,7 +56,10 @@ def _to_schema_block(block: AnyBlock) -> SchemaBlock:
     if isinstance(block, ListBlock):
         return SchemaBlock(block_type="list", items=block.items)
     if isinstance(block, TableBlock):
-        return SchemaBlock(block_type="table", table=NormalizedTable(header=block.columns, rows=block.rows))
+        return SchemaBlock(
+            block_type="table",
+            table=NormalizedTable(header=block.columns, rows=block.rows),
+        )
     raise ValueError(f"unexpected block type in content_blocks: {block.type!r}")
 
 
@@ -70,13 +81,24 @@ def to_normalized_document(
     for page in document.pages:
         page_blocks = blocks_by_page.get(page.page_number, [])
         entries = [
-            BlockEntry(block=_to_schema_block(block), preceded_by_blank=False) for block in page_blocks
+            BlockEntry(block=_to_schema_block(block), preceded_by_blank=False)
+            for block in page_blocks
         ]
         text, positioned_blocks = _render_blocks(entries)
-        pages.append(NormalizedPage(page_number=page.page_number, text=text, blocks=positioned_blocks))
+        pages.append(
+            NormalizedPage(
+                page_number=page.page_number, text=text, blocks=positioned_blocks
+            )
+        )
 
-    delimiters = [_page_delimiter(current.text, following.text) for current, following in zip(pages, pages[1:])]
-    full_text = "".join(page.text + (delimiters[index] if index < len(delimiters) else "") for index, page in enumerate(pages))
+    delimiters = [
+        _page_delimiter(current.text, following.text)
+        for current, following in zip(pages, pages[1:])
+    ]
+    full_text = "".join(
+        page.text + (delimiters[index] if index < len(delimiters) else "")
+        for index, page in enumerate(pages)
+    )
     full_text = _EXCESS_BLANK_LINES_RE.sub("\n\n", full_text)
 
     return NormalizedDocument(

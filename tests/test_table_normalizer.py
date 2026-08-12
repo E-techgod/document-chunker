@@ -19,7 +19,11 @@ def test_wrapped_last_column_merges_into_the_same_cell():
 
     assert table.header == ["Industry", "% of Postings", "Key Use Cases"]
     assert table.rows == [
-        ["Manufacturing / Auto", "6%", "Predictive maintenance, computer vision, supply chain"],
+        [
+            "Manufacturing / Auto",
+            "6%",
+            "Predictive maintenance, computer vision, supply chain",
+        ],
     ]
 
 

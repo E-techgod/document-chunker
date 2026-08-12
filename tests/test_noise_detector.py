@@ -142,9 +142,30 @@ def test_unique_non_repeated_lines_are_not_flagged():
 
 def test_repeated_line_outside_the_header_footer_zone_is_not_flagged():
     pages = [
-        ["Heading", "Subheading", "Repeated mid-page line", "Body one.", "Footer A", "Footer B"],
-        ["Heading", "Subheading", "Repeated mid-page line", "Body two.", "Footer A", "Footer B"],
-        ["Heading", "Subheading", "Repeated mid-page line", "Body three.", "Footer A", "Footer B"],
+        [
+            "Heading",
+            "Subheading",
+            "Repeated mid-page line",
+            "Body one.",
+            "Footer A",
+            "Footer B",
+        ],
+        [
+            "Heading",
+            "Subheading",
+            "Repeated mid-page line",
+            "Body two.",
+            "Footer A",
+            "Footer B",
+        ],
+        [
+            "Heading",
+            "Subheading",
+            "Repeated mid-page line",
+            "Body three.",
+            "Footer A",
+            "Footer B",
+        ],
     ]
 
     result = detect_noise_lines(pages, zone_size=2)
@@ -160,7 +181,15 @@ def test_noise_line_indices_skip_over_blank_lines_correctly():
     pages = [
         ["Running Title", "", "Section one", "Body one.", "", "Footer A", "Footer B"],
         ["Running Title", "", "Section two", "Body two.", "", "Footer A", "Footer B"],
-        ["Running Title", "", "Section three", "Body three.", "", "Footer A", "Footer B"],
+        [
+            "Running Title",
+            "",
+            "Section three",
+            "Body three.",
+            "",
+            "Footer A",
+            "Footer B",
+        ],
     ]
 
     result = detect_noise_lines(pages)

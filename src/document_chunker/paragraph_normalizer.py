@@ -5,7 +5,11 @@ from typing import Literal
 from document_chunker.heading_detector import detect_heading_level
 from document_chunker.list_detector import is_continuation_line, match_list_item
 from document_chunker.noise_detector import detect_noise_lines
-from document_chunker.normalizer import _HORIZONTAL_WHITESPACE_RE, _measure_indent, _preprocess_text
+from document_chunker.normalizer import (
+    _HORIZONTAL_WHITESPACE_RE,
+    _measure_indent,
+    _preprocess_text,
+)
 from document_chunker.schemas import ExtractedDocument
 from document_chunker.structured_models import (
     HeadingBlock,
@@ -42,7 +46,9 @@ from document_chunker.table_parser import is_table_row_candidate, parse_table_re
 # which reuses table_normalizer.TableNormalizer - the same position-based algorithm
 # already proven against this repo's own real-world PDF tables for the older pipeline.
 
-_BlockKind = Literal["heading", "paragraph", "list", "table", "page_header", "page_footer"]
+_BlockKind = Literal[
+    "heading", "paragraph", "list", "table", "page_header", "page_footer"
+]
 _MID_SENTENCE_CONTINUATION_RE = re.compile(r"[.!?:][\"')\]]*$")
 
 
@@ -69,7 +75,10 @@ def _starts_with_lowercase(text: str) -> bool:
 
 
 def _should_space_join_page_boundary(
-    current_page: int, current_entry: _BlockEntry, next_page: int, next_entry: _BlockEntry
+    current_page: int,
+    current_entry: _BlockEntry,
+    next_page: int,
+    next_entry: _BlockEntry,
 ) -> bool:
     if current_entry.kind != "paragraph" or next_entry.kind != "paragraph":
         return False
@@ -112,7 +121,13 @@ def _split_into_blocks(
     def flush_list() -> None:
         flush_current_item()
         if completed_items:
-            entries.append(_BlockEntry(kind="list", text="\n".join(completed_items), items=list(completed_items)))
+            entries.append(
+                _BlockEntry(
+                    kind="list",
+                    text="\n".join(completed_items),
+                    items=list(completed_items),
+                )
+            )
         completed_items.clear()
 
     lines = preprocessed_text.split("\n")
@@ -153,12 +168,16 @@ def _split_into_blocks(
             continue
 
         if is_table_row_candidate(line):
-            table, next_index = parse_table_region(lines, index, noise_line_indices=noise_line_indices)
+            table, next_index = parse_table_region(
+                lines, index, noise_line_indices=noise_line_indices
+            )
             if table is not None:
                 flush_paragraph()
                 flush_list()
                 columns, rows, text = table
-                entries.append(_BlockEntry(kind="table", text=text, columns=columns, rows=rows))
+                entries.append(
+                    _BlockEntry(kind="table", text=text, columns=columns, rows=rows)
+                )
                 index = next_index
                 continue
 
@@ -176,7 +195,9 @@ def _split_into_blocks(
     return entries
 
 
-def build_structured_document(document: ExtractedDocument) -> StructuredNormalizedDocument:
+def build_structured_document(
+    document: ExtractedDocument,
+) -> StructuredNormalizedDocument:
     """Reconstruct HeadingBlocks, ParagraphBlocks, ListBlocks, and TableBlocks from raw
     per-page extractor text and assemble the canonical full_text, interleaved in
     document order. A page boundary always starts a new block - text is never joined
@@ -195,23 +216,37 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
     noise_by_page = detect_noise_lines(page_line_lists)
 
     entries: list[tuple[int, _BlockEntry]] = []
-    for page, preprocessed, noise_line_indices in zip(document.pages, preprocessed_pages, noise_by_page):
-        for entry in _split_into_blocks(preprocessed, noise_line_indices=noise_line_indices):
+    for page, preprocessed, noise_line_indices in zip(
+        document.pages, preprocessed_pages, noise_by_page
+    ):
+        for entry in _split_into_blocks(
+            preprocessed, noise_line_indices=noise_line_indices
+        ):
             entries.append((page.page_number, entry))
 
     delimiters: list[str] = []
     for index, (page_number, entry) in enumerate(entries[:-1]):
         next_page_number, next_entry = entries[index + 1]
-        if _should_space_join_page_boundary(page_number, entry, next_page_number, next_entry):
+        if _should_space_join_page_boundary(
+            page_number, entry, next_page_number, next_entry
+        ):
             delimiters.append(" ")
         else:
             delimiters.append("\n\n")
 
     full_text = "".join(
-        entry.text + (delimiters[index] if index < len(delimiters) else "") for index, (_, entry) in enumerate(entries)
+        entry.text + (delimiters[index] if index < len(delimiters) else "")
+        for index, (_, entry) in enumerate(entries)
     )
 
-    blocks: list[HeadingBlock | ParagraphBlock | ListBlock | TableBlock | PageHeaderBlock | PageFooterBlock] = []
+    blocks: list[
+        HeadingBlock
+        | ParagraphBlock
+        | ListBlock
+        | TableBlock
+        | PageHeaderBlock
+        | PageFooterBlock
+    ] = []
     cursor = 0
     for index, (page_number, entry) in enumerate(entries):
         start = cursor
@@ -220,13 +255,23 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
         if entry.kind == "heading":
             blocks.append(
                 HeadingBlock(
-                    block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end, level=entry.level
+                    block_id=block_id,
+                    text=entry.text,
+                    page=page_number,
+                    start_char=start,
+                    end_char=end,
+                    level=entry.level,
                 )
             )
         elif entry.kind == "list":
             blocks.append(
                 ListBlock(
-                    block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end, items=entry.items
+                    block_id=block_id,
+                    text=entry.text,
+                    page=page_number,
+                    start_char=start,
+                    end_char=end,
+                    items=entry.items,
                 )
             )
         elif entry.kind == "table":
@@ -243,17 +288,39 @@ def build_structured_document(document: ExtractedDocument) -> StructuredNormaliz
             )
         elif entry.kind == "page_header":
             blocks.append(
-                PageHeaderBlock(block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end)
+                PageHeaderBlock(
+                    block_id=block_id,
+                    text=entry.text,
+                    page=page_number,
+                    start_char=start,
+                    end_char=end,
+                )
             )
         elif entry.kind == "page_footer":
             blocks.append(
-                PageFooterBlock(block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end)
+                PageFooterBlock(
+                    block_id=block_id,
+                    text=entry.text,
+                    page=page_number,
+                    start_char=start,
+                    end_char=end,
+                )
             )
         else:
-            blocks.append(ParagraphBlock(block_id=block_id, text=entry.text, page=page_number, start_char=start, end_char=end))
+            blocks.append(
+                ParagraphBlock(
+                    block_id=block_id,
+                    text=entry.text,
+                    page=page_number,
+                    start_char=start,
+                    end_char=end,
+                )
+            )
         if index < len(delimiters):
             cursor = end + len(delimiters[index])
         else:
             cursor = end
 
-    return StructuredNormalizedDocument(document_id=document.document_id, full_text=full_text, blocks=blocks)
+    return StructuredNormalizedDocument(
+        document_id=document.document_id, full_text=full_text, blocks=blocks
+    )
