@@ -188,3 +188,28 @@ class ChunkValidationReport(BaseModel): # The full set of invariant violations f
     def is_valid(self) -> bool:
         return not self.issues
 
+
+OverheadSource = Literal["overlap", "context_prefix", "none"]
+
+
+class ChunkQualityReport(BaseModel):
+    """Quantitative quality scoring for one ChunkingResult - how good a chunking is, as
+    opposed to ChunkValidationReport's pass/fail invariant check. Lets V1 (character),
+    V2.1 (structural), and V2.2 (structural + context carry) be compared side by side on
+    the same document."""
+
+    document_id: str
+    chunking_strategy: str
+    propagate_context: bool
+    is_valid: bool
+    chunk_count: int = Field(ge=0)
+    avg_utilization: float = Field(ge=0)  # mean chunk char_count / max_chunk_size
+    tiny_chunk_count: int = Field(default=0, ge=0)
+    tiny_chunk_ratio: float = Field(default=0, ge=0, le=1)  # share of chunks under TINY_CHUNK_RATIO of max size
+    word_splits: int = Field(default=0, ge=0)  # chunk boundaries cutting through a word inside a heading/paragraph
+    bullet_splits: int = Field(default=0, ge=0)  # chunk boundaries cutting through a list item
+    table_row_splits: int = Field(default=0, ge=0)  # chunk boundaries cutting through a table row
+    context_overhead: float = Field(default=0, ge=0)  # redundant chars (overlap or context_prefix) / total chars
+    overhead_source: OverheadSource = "none"  # which mechanism produced context_overhead, for display
+    context_coverage: float | None = Field(default=None, ge=0, le=1)  # None when propagate_context is off (N/A)
+
