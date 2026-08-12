@@ -17,7 +17,7 @@ ACTIVE_CHUNKING_STRATEGY = "v2.2" # v1.0: character chunking with overlap, v2.1:
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
-    path = sys.argv[1] if len(sys.argv) > 1 else "data/BAWSE.pdf"
+    path = sys.argv[1] if len(sys.argv) > 1 else "data/sample.pdf"
     password = sys.argv[2] if len(sys.argv) > 2 else ""
     strategy_label, chunking_config = get_chunking_strategy(ACTIVE_CHUNKING_STRATEGY)
 
