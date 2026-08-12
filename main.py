@@ -63,13 +63,14 @@ def main() -> None:
         for issue in step2_issues:
             print(f"  {issue}")
 
-    noise_blocks = [b for b in structured.blocks if b.is_noise]
+    # This is a non-fatal warning for noise detection, which is expected in many PDFs (e.g., page headers/footers). It does not indicate a bug in the chunking process.
+    """noise_blocks = [b for b in structured.blocks if b.is_noise]
     print(
         f"Noise detection: {len(noise_blocks)} block(s) excluded from chunking "
         "(page headers/footers)."
     )
     if noise_blocks:
-        print(f"  e.g. {sorted({b.text for b in noise_blocks})[:5]}")
+        print(f"  e.g. {sorted({b.text for b in noise_blocks})[:5]}")"""
 
     normalized = to_normalized_document(extracted, structured)
 
@@ -111,10 +112,11 @@ def main() -> None:
             print(f"[context]\n{chunk.context_prefix}")
         print(f"[content]\n{chunk.text}\n")
 
-    for debug_index in (7, 17, 24, 38):
+    # This will debug specific chunks by index if needed. Uncomment the following block to enable it.
+    """for debug_index in (7, 17, 24, 38):
         if debug_index < len(chunker.chunks):
             print(f"Chunk {debug_index}: ")
-            print(f"[content]\n{chunker.chunks[debug_index].text}\n")
+            print(f"[content]\n{chunker.chunks[debug_index].text}\n")"""
 
     report = validate_chunks(normalized, chunker, chunking_config)
     if report.is_valid:
