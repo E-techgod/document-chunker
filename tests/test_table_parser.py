@@ -40,7 +40,7 @@ def test_simple_table_reconstructs_columns_and_rows():
     result, consumed = parse_table_region(lines, 0)
 
     assert result is not None
-    columns, rows, text = result
+    columns, rows, _text = result
     assert columns == ["Name", "Role", "Score"]
     assert rows == [["Ana", "Engineer", "98"], ["Bob", "Analyst", "91"]]
     assert consumed == 3

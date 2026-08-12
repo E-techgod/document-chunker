@@ -260,9 +260,7 @@ def _has_strong_paragraph_stop(
         return True
     if _is_heading_like(following.text) or _is_title_cased_short_line(following.text):
         return True
-    if _looks_like_section_label(following.text):
-        return True
-    return False
+    return bool(_looks_like_section_label(following.text))
 
 
 def _has_paragraph_join_signal(
@@ -280,9 +278,7 @@ def _has_paragraph_join_signal(
         return True
     if _looks_visually_wrapped(current):
         return True
-    if _looks_like_wrapped_fragment(current, following):
-        return True
-    return False
+    return bool(_looks_like_wrapped_fragment(current, following))
 
 
 def _starts_like_paragraph_continuation(line: ClassifiedLine) -> bool:

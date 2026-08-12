@@ -1,3 +1,5 @@
+import itertools
+
 from document_chunker.chunker import (
     STRUCTURAL_STRATEGY,
     oversized_table_header_pairs,
@@ -85,7 +87,7 @@ def _check_overlap(
     chunks: list[DocumentChunk], config: ChunkingConfig
 ) -> list[ChunkValidationIssue]:
     issues = []
-    for current, following in zip(chunks, chunks[1:]):
+    for current, following in itertools.pairwise(chunks):
         is_full_sized = (current.end_char - current.start_char) == config.max_chunk_size
         # A skipped whitespace-only span leaves an actual gap between current.end_char
         # and following.start_char in the output; only compare overlap between chunks
@@ -206,7 +208,7 @@ def _check_offsets(
 def _check_element_order(elements: list[tuple[int, int]]) -> list[ChunkValidationIssue]:
     """Structural elements must remain in source order (non-overlapping, strictly forward)."""
     issues = []
-    for previous, current in zip(elements, elements[1:]):
+    for previous, current in itertools.pairwise(elements):
         if current[0] < previous[1]:
             issues.append(
                 ChunkValidationIssue(

@@ -1,3 +1,4 @@
+import itertools
 from bisect import bisect_right
 
 from document_chunker.chunker import document_structural_units
@@ -80,7 +81,7 @@ def _overlap_overhead(chunks: list[DocumentChunk]) -> float:
         return 0.0
     redundant = sum(
         max(0, earlier.end_char - later.start_char)
-        for earlier, later in zip(chunks, chunks[1:])
+        for earlier, later in itertools.pairwise(chunks)
     )
     return redundant / total_chars
 

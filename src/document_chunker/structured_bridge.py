@@ -1,3 +1,4 @@
+import itertools
 import re
 
 from document_chunker.normalizer import (
@@ -93,7 +94,7 @@ def to_normalized_document(
 
     delimiters = [
         _page_delimiter(current.text, following.text)
-        for current, following in zip(pages, pages[1:])
+        for current, following in itertools.pairwise(pages)
     ]
     full_text = "".join(
         page.text + (delimiters[index] if index < len(delimiters) else "")
