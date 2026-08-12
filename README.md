@@ -12,15 +12,16 @@ This is not just "text extraction" anymore. The current codebase includes:
 - a bridge back into the normalized document model used for chunking
 - multiple chunking strategies
 - invariant-based chunk validation
+- chunk quality evaluation and cross-strategy comparison tooling
 - generated graph reports for codebase inspection
 
 ## Architecture
 
 The generated graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, and `graphify-out/graph.html` currently reports:
 
-- `653` nodes
-- `1470` edges
-- `24` communities
+- `693` nodes
+- `1607` edges
+- `28` communities
 - no import cycles detected
 
 ```mermaid
@@ -162,6 +163,7 @@ flowchart TD
 
 ```text
 main.py
+compare_strategies.py
 src/document_chunker/
   chunker.py
   chunking_strategies.py
@@ -174,6 +176,7 @@ src/document_chunker/
   noise_detector.py
   normalizer.py
   paragraph_normalizer.py
+  quality.py
   schemas.py
   step2_pipeline.py
   structured_bridge.py
@@ -209,6 +212,35 @@ The runner currently:
 - prints chunk ranges and sample chunk contents
 - validates the chunk output and exits non-zero on chunk invariant failures
 
+## Comparing Chunking Strategies
+
+`compare_strategies.py` runs the same document through all three chunking strategies (`v1.0`, `v2.1`, `v2.2`) and prints a side-by-side quality comparison built on `evaluate_chunk_quality()`:
+
+```bash
+uv run compare_strategies.py [path/to/file.pdf] [password]
+```
+
+If no arguments are provided, it defaults to `data/BAWSE.pdf`. Example output:
+
+```text
+Chunk quality comparison for data/BAWSE.pdf
+
+Metric                V1       V2.1      V2.2   
+------------------------------------------------
+Valid                 ✓         ✓         ✓     
+Chunks                37        37        37    
+Avg utilization      99%       89%       89%    
+Tiny chunks           0%        0%        0%    
+Word splits           14        0         0     
+Bullet splits         41        0         0     
+Table-row splits      9         0         0     
+Context overhead     10%*       0%        2%    
+Context coverage     N/A       N/A       97%    
+* overlap redundancy from character-based chunking, not injected context
+```
+
+`v2.2` (structural chunking with context carry) is the only strategy that avoids splitting words, bullets, and table rows while still tracking near-complete context coverage — the tradeoff for `v1.0`'s higher raw utilization is the loss of structural integrity.
+
 ## Tests
 
 The graph report and current test tree show coverage across the pipeline and its structural helpers, including:
@@ -227,6 +259,7 @@ The graph report and current test tree show coverage across the pipeline and its
 - `test_table_parser.py`
 - `test_structured_bridge.py`
 - `test_structured_models.py`
+- `test_quality.py`
 
 The suite is not just stage-by-stage smoke coverage. It also exercises structural reconstruction, heading/list heuristics, noise detection, table behavior, bridging, and chunk/evaluator invariants.
 
@@ -252,4 +285,4 @@ Regenerate the graph with:
 graphify update .
 ```
 
-The current report was generated on `2026-08-12` and records commit `b9081536` as its source snapshot.
+The current report was generated on `2026-08-12` and records commit `b2ca871f` as its source snapshot.
