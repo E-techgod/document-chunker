@@ -154,6 +154,15 @@ def structural_elements(document: NormalizedDocument) -> list[tuple[int, int]]:
     ]
 
 
+def document_structural_units(document: NormalizedDocument) -> list[tuple[int, int, str]]:
+    """Document-order (start, end, block_type) triples for every atomic structural unit
+    (heading, paragraph, list item, table row) in `document.full_text` - the same units
+    structural_elements() exposes as bare spans, with the block type kept alongside so
+    callers (e.g. chunk-quality scoring) can tell a split list item from a split table
+    row from a split word inside a paragraph."""
+    return [(unit.start, unit.end, unit.block_type) for unit in _document_units(document)]
+
+
 def structural_pieces(document: NormalizedDocument, max_chunk_size: int) -> list[tuple[int, int]]:
     """structural_elements(), with any element longer than max_chunk_size further split at
     sentence boundaries. These are the exact units chunk_document packs into chunks."""
