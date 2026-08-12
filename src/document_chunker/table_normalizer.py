@@ -17,7 +17,8 @@ def _segment_positions(raw_text: str) -> list[tuple[int, str]]:
     """(start_offset, text) for each column-like segment in `raw_text` - the line's
     original, un-stripped text, so offsets are absolute character positions comparable
     across every physical line of the same table. Split on '|' if present, otherwise on
-    2+-space gaps (the same convention normalize_page's line-level table detection uses)."""
+    2+-space gaps (the same convention normalize_page's line-level table detection uses).
+    """
     segments: list[tuple[int, str]] = []
     cursor = 0
 
@@ -51,7 +52,9 @@ def _nearest_column(offset: int, column_starts: list[int]) -> int:
     return min(range(len(column_starts)), key=lambda i: abs(column_starts[i] - offset))
 
 
-def _assign_columns_in_order(segments: list[tuple[int, str]], column_starts: list[int]) -> list[int]:
+def _assign_columns_in_order(
+    segments: list[tuple[int, str]], column_starts: list[int]
+) -> list[int]:
     """Column index for each of `segments`, in order, each strictly after the last -
     unlike independent nearest-column matching per segment, this never assigns two
     segments to the same or an earlier column than the one before it. Needed because a
@@ -62,7 +65,11 @@ def _assign_columns_in_order(segments: list[tuple[int, str]], column_starts: lis
     floor = 0
     for offset, _ in segments:
         candidates = range(floor, len(column_starts))
-        best = min(candidates, key=lambda i: abs(column_starts[i] - offset)) if candidates else floor
+        best = (
+            min(candidates, key=lambda i: abs(column_starts[i] - offset))
+            if candidates
+            else floor
+        )
         assigned.append(best)
         floor = min(best + 1, len(column_starts) - 1)
     return assigned
@@ -100,13 +107,17 @@ class TableNormalizer:
         """Physical lines belonging to this table: everything up to the next blank or
         list-item line, exactly like normalize_page's other block boundaries."""
         end_index = start_index
-        while end_index < len(lines) and lines[end_index].line_type not in {"blank", "list_item"}:
+        while end_index < len(lines) and lines[end_index].line_type not in {
+            "blank",
+            "list_item",
+        }:
             end_index += 1
         return end_index
 
     def infer_column_starts(self, header_line: ClassifiedLine) -> list[int]:
         """Column count and start offsets, inferred from the header (or first data row,
-        for a headerless table) - the reference grid every later line is matched against."""
+        for a headerless table) - the reference grid every later line is matched against.
+        """
         segments = _segment_positions(header_line.raw_text)
         if segments:
             return [offset for offset, _ in segments]
@@ -143,9 +154,16 @@ class TableNormalizer:
             line = lines[row_index]
             segments = _segment_positions(line.raw_text)
             assigned_columns = _assign_columns_in_order(segments, active_column_starts)
-            skips_column_one = len(segments) >= 2 and len(active_column_starts) >= 2 and 1 not in assigned_columns
+            skips_column_one = (
+                len(segments) >= 2
+                and len(active_column_starts) >= 2
+                and 1 not in assigned_columns
+            )
 
-            if _nearest_column(line.indent, active_column_starts) == 0 and not skips_column_one:
+            if (
+                _nearest_column(line.indent, active_column_starts) == 0
+                and not skips_column_one
+            ):
                 # Prefer the segments already extracted from raw_text over
                 # re-parsing line.text: for a line classified "text" (as opposed to
                 # "table_row"), .text has had its internal whitespace collapsed by
@@ -154,8 +172,10 @@ class TableNormalizer:
                 # the unmodified raw_text) already found them just fine. Falling back to
                 # _parse_table_row only covers cases with too few positional segments,
                 # e.g. a single-space-separated row needing its token-count fallback.
-                row = [text for _, text in segments] if len(segments) >= 2 else _parse_table_row(
-                    line, expected_columns=expected_columns
+                row = (
+                    [text for _, text in segments]
+                    if len(segments) >= 2
+                    else _parse_table_row(line, expected_columns=expected_columns)
                 )
                 if len(row) >= 2:
                     rows.append(row)
@@ -189,7 +209,9 @@ class TableNormalizer:
 
         return rows, row_uses_pipe_delimiter, row_index
 
-    def _merge_by_position(self, row: list[str], line: ClassifiedLine, column_starts: list[int]) -> None:
+    def _merge_by_position(
+        self, row: list[str], line: ClassifiedLine, column_starts: list[int]
+    ) -> None:
         """Append each of `line`'s segments into the cell of `row` whose column start is
         nearest its own offset - handles both a single wrapped fragment and multiple
         columns' wrapped text sharing one physical line."""
@@ -204,7 +226,9 @@ class TableNormalizer:
         """Append `line`'s content using the existing content-shape heuristic (scan for a
         trailing wrap-continuation signal, else the last non-numeric cell)."""
         segments = _segment_positions(line.raw_text)
-        continuation_text = segments[0][1] if segments else _normalize_inline_text(line.text)
+        continuation_text = (
+            segments[0][1] if segments else _normalize_inline_text(line.text)
+        )
         _append_wrapped_table_text(row, continuation_text)
 
     def _has_exact_two_row_coherence(
@@ -221,16 +245,22 @@ class TableNormalizer:
         body_segments = _segment_positions(lines[start_index + 1].raw_text)
         return len(body_segments) == len(rows[0])
 
-    def build(self, lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock | None, int]:
+    def build(
+        self, lines: list[ClassifiedLine], start_index: int
+    ) -> tuple[NormalizedBlock | None, int]:
         header_values = self.detect_header(lines, start_index)
         if len(header_values) < 2:
             return None, start_index
 
         end_index = self.collect_region(lines, start_index)
         column_starts = self.infer_column_starts(lines[start_index])
-        rows, _, consumed_index = self.reconstruct_rows(lines, start_index, end_index, header_values, column_starts)
+        rows, _, consumed_index = self.reconstruct_rows(
+            lines, start_index, end_index, header_values, column_starts
+        )
 
-        if len(rows) < 2 or not self._has_exact_two_row_coherence(lines, start_index, rows):
+        if len(rows) < 2 or not self._has_exact_two_row_coherence(
+            lines, start_index, rows
+        ):
             return None, start_index
 
         if _looks_like_header_row(rows[0], rows[1:]):
@@ -256,7 +286,9 @@ class TableNormalizer:
             lines, start_index, end_index, header_values, column_starts
         )
 
-        if len(rows) < 2 or not self._has_exact_two_row_coherence(lines, start_index, rows):
+        if len(rows) < 2 or not self._has_exact_two_row_coherence(
+            lines, start_index, rows
+        ):
             return None, start_index, []
 
         if _looks_like_header_row(rows[0], rows[1:]):
@@ -267,4 +299,8 @@ class TableNormalizer:
             body_row_uses_pipe_delimiter = row_uses_pipe_delimiter
 
         table = NormalizedTable(header=header, rows=body)
-        return NormalizedBlock(block_type="table", table=table), consumed_index, body_row_uses_pipe_delimiter
+        return (
+            NormalizedBlock(block_type="table", table=table),
+            consumed_index,
+            body_row_uses_pipe_delimiter,
+        )

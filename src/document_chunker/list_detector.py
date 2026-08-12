@@ -13,11 +13,11 @@ from document_chunker.normalizer import _measure_indent
 
 _LIST_MARKER_RE = re.compile(
     r"^(?:"
-    r"[•⁃■●→–*\-]"         # symbol bullets ('●'/'→' are the actual bullets in this repo's own sample PDFs)
-    r"|\d+[.)]"             # 1.  2)
-    r"|\([A-Za-z0-9]+\)"    # (a)  (1)
-    r"|[A-Za-z][.)]"        # A.  a)  i.
-    r"|\[\d+\]"             # [1]
+    r"[•⁃■●→–*\-]"  # symbol bullets ('●'/'→' are the actual bullets in this repo's own sample PDFs)
+    r"|\d+[.)]"  # 1.  2)
+    r"|\([A-Za-z0-9]+\)"  # (a)  (1)
+    r"|[A-Za-z][.)]"  # A.  a)  i.
+    r"|\[\d+\]"  # [1]
     r")\s+"
 )
 

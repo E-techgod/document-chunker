@@ -4,7 +4,6 @@ from document_chunker.chunker import chunk_document
 from document_chunker.normalizer import normalize_document
 from document_chunker.schemas import ChunkingConfig
 
-
 # --- happy path ---
 
 
@@ -29,7 +28,9 @@ def test_chunk_document_produces_expected_offsets(make_normalized_document):
 
 
 def test_chunk_document_word_and_char_counts_match_text(make_normalized_document):
-    document = make_normalized_document(["hello world foo bar"], full_text="hello world foo bar")
+    document = make_normalized_document(
+        ["hello world foo bar"], full_text="hello world foo bar"
+    )
     result = chunk_document(document, ChunkingConfig(max_chunk_size=11, overlap_size=0))
 
     for chunk in result.chunks:
@@ -62,7 +63,9 @@ def test_chunk_document_records_chunking_strategy(make_normalized_document):
 
 
 def test_chunk_document_computed_totals_match_chunks(make_normalized_document):
-    document = make_normalized_document(["hello world foo bar"], full_text="hello world foo bar")
+    document = make_normalized_document(
+        ["hello world foo bar"], full_text="hello world foo bar"
+    )
     result = chunk_document(document, ChunkingConfig(max_chunk_size=7, overlap_size=2))
 
     assert result.chunk_count == len(result.chunks)
@@ -78,7 +81,9 @@ def test_chunk_document_uses_default_config_when_none_given(make_normalized_docu
     assert result.chunks[0].text == "short text"
 
 
-def test_chunk_document_page_numbers_reflect_overlapping_pages(make_normalized_document):
+def test_chunk_document_page_numbers_reflect_overlapping_pages(
+    make_normalized_document,
+):
     texts = ["Page one content here.", "Page two content here."]
     document = make_normalized_document(texts)  # full_text joins with "\n\n"
 
@@ -93,15 +98,21 @@ def test_chunk_document_page_numbers_reflect_overlapping_pages(make_normalized_d
 
 def test_empty_document_returns_zero_chunks(make_normalized_document):
     document = make_normalized_document([""], full_text="")
-    result = chunk_document(document, ChunkingConfig(max_chunk_size=100, overlap_size=10))
+    result = chunk_document(
+        document, ChunkingConfig(max_chunk_size=100, overlap_size=10)
+    )
 
     assert result.chunks == []
     assert result.chunk_count == 0
 
 
-def test_document_smaller_than_chunk_size_returns_a_single_chunk(make_normalized_document):
+def test_document_smaller_than_chunk_size_returns_a_single_chunk(
+    make_normalized_document,
+):
     document = make_normalized_document(["short text"], full_text="short text")
-    result = chunk_document(document, ChunkingConfig(max_chunk_size=1000, overlap_size=200))
+    result = chunk_document(
+        document, ChunkingConfig(max_chunk_size=1000, overlap_size=200)
+    )
 
     assert len(result.chunks) == 1
     assert result.chunks[0].text == "short text"
@@ -119,7 +130,9 @@ def test_final_chunk_is_not_padded(make_normalized_document):
     assert len(last_chunk.text) < 5
 
 
-def test_overlap_zero_produces_contiguous_non_overlapping_chunks(make_normalized_document):
+def test_overlap_zero_produces_contiguous_non_overlapping_chunks(
+    make_normalized_document,
+):
     document = make_normalized_document(["ABCDEFGHIJKL"], full_text="ABCDEFGHIJKL")
     result = chunk_document(document, ChunkingConfig(max_chunk_size=4, overlap_size=0))
 
@@ -129,11 +142,15 @@ def test_overlap_zero_produces_contiguous_non_overlapping_chunks(make_normalized
 
 
 @pytest.mark.parametrize("overlap_size", [10, 15])
-def test_overlap_size_greater_or_equal_to_max_chunk_size_is_invalid(make_normalized_document, overlap_size):
+def test_overlap_size_greater_or_equal_to_max_chunk_size_is_invalid(
+    make_normalized_document, overlap_size
+):
     document = make_normalized_document(["some reasonably long piece of text"])
 
     with pytest.raises(ValueError):
-        chunk_document(document, ChunkingConfig(max_chunk_size=10, overlap_size=overlap_size))
+        chunk_document(
+            document, ChunkingConfig(max_chunk_size=10, overlap_size=overlap_size)
+        )
 
 
 def test_whitespace_only_chunks_are_skipped(make_normalized_document):
@@ -160,7 +177,9 @@ def _normalized(make_extract_document, texts):
     return normalize_document(make_extract_document(texts))
 
 
-def test_structural_strategy_packs_headings_paragraphs_lists_and_tables_atomically(make_extract_document):
+def test_structural_strategy_packs_headings_paragraphs_lists_and_tables_atomically(
+    make_extract_document,
+):
     text = (
         "IMPORTANT NOTICE:\n\n"
         "This is a simple paragraph explaining something in detail for testing purposes.\n\n"
@@ -173,7 +192,12 @@ def test_structural_strategy_packs_headings_paragraphs_lists_and_tables_atomical
     )
     document = _normalized(make_extract_document, [text])
 
-    result = chunk_document(document, ChunkingConfig(max_chunk_size=60, overlap_size=0, chunking_strategy="structural"))
+    result = chunk_document(
+        document,
+        ChunkingConfig(
+            max_chunk_size=60, overlap_size=0, chunking_strategy="structural"
+        ),
+    )
 
     assert result.chunking_strategy == "structural"
     assert [c.text for c in result.chunks] == [
@@ -185,25 +209,45 @@ def test_structural_strategy_packs_headings_paragraphs_lists_and_tables_atomical
     ]
 
 
-def test_structural_strategy_closes_chunk_before_element_that_would_overflow(make_extract_document):
+def test_structural_strategy_closes_chunk_before_element_that_would_overflow(
+    make_extract_document,
+):
     document = _normalized(
         make_extract_document,
-        ["- First item in the list\n- Second item in the list\n- Third item in the list"],
+        [
+            "- First item in the list\n- Second item in the list\n- Third item in the list"
+        ],
     )
 
-    result = chunk_document(document, ChunkingConfig(max_chunk_size=50, overlap_size=0, chunking_strategy="structural"))
+    result = chunk_document(
+        document,
+        ChunkingConfig(
+            max_chunk_size=50, overlap_size=0, chunking_strategy="structural"
+        ),
+    )
 
-    assert result.chunks[0].text == "- First item in the list\n- Second item in the list"
+    assert (
+        result.chunks[0].text == "- First item in the list\n- Second item in the list"
+    )
     assert result.chunks[1].text == "- Third item in the list"
     assert all(len(c.text) <= 50 for c in result.chunks)
 
 
-def test_structural_strategy_splits_oversized_paragraph_at_sentence_boundaries(make_extract_document):
-    sentences = [f"This is sentence number {i} in a very long paragraph. " for i in range(1, 6)]
+def test_structural_strategy_splits_oversized_paragraph_at_sentence_boundaries(
+    make_extract_document,
+):
+    sentences = [
+        f"This is sentence number {i} in a very long paragraph. " for i in range(1, 6)
+    ]
     text = "".join(sentences).strip()
     document = _normalized(make_extract_document, [text])
 
-    result = chunk_document(document, ChunkingConfig(max_chunk_size=60, overlap_size=0, chunking_strategy="structural"))
+    result = chunk_document(
+        document,
+        ChunkingConfig(
+            max_chunk_size=60, overlap_size=0, chunking_strategy="structural"
+        ),
+    )
 
     assert len(result.chunks) > 1
     for chunk in result.chunks:
@@ -211,13 +255,20 @@ def test_structural_strategy_splits_oversized_paragraph_at_sentence_boundaries(m
         assert chunk.text.rstrip().endswith(".")
 
 
-def test_structural_strategy_allows_chunks_to_span_page_boundaries(make_extract_document):
+def test_structural_strategy_allows_chunks_to_span_page_boundaries(
+    make_extract_document,
+):
     document = _normalized(
         make_extract_document,
         ["This is page one paragraph.", "This is page two paragraph."],
     )
 
-    result = chunk_document(document, ChunkingConfig(max_chunk_size=200, overlap_size=0, chunking_strategy="structural"))
+    result = chunk_document(
+        document,
+        ChunkingConfig(
+            max_chunk_size=200, overlap_size=0, chunking_strategy="structural"
+        ),
+    )
 
     assert len(result.chunks) == 1
     assert result.chunks[0].page_numbers == [1, 2]
@@ -233,7 +284,12 @@ def test_structural_strategy_produces_no_overlap_between_chunks(make_extract_doc
     )
     document = _normalized(make_extract_document, [text])
 
-    result = chunk_document(document, ChunkingConfig(max_chunk_size=50, overlap_size=0, chunking_strategy="structural"))
+    result = chunk_document(
+        document,
+        ChunkingConfig(
+            max_chunk_size=50, overlap_size=0, chunking_strategy="structural"
+        ),
+    )
 
     for earlier, later in zip(result.chunks, result.chunks[1:]):
         assert later.start_char >= earlier.end_char
@@ -245,10 +301,14 @@ def test_structural_strategy_produces_no_overlap_between_chunks(make_extract_doc
 def test_context_disabled_by_default_reproduces_v21_output(make_extract_document):
     text = "WEEK 4 OVERVIEW\n\n- Master Git basics\n- Call public REST APIs\n- Push to GitHub\n"
     document = _normalized(make_extract_document, [text])
-    config = ChunkingConfig(max_chunk_size=50, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=50, overlap_size=0, chunking_strategy="structural"
+    )
 
     with_flag_off = chunk_document(document, config)
-    without_flag = chunk_document(document, config.model_copy(update={"propagate_context": False}))
+    without_flag = chunk_document(
+        document, config.model_copy(update={"propagate_context": False})
+    )
 
     assert [(c.start_char, c.end_char, c.text) for c in with_flag_off.chunks] == [
         (c.start_char, c.end_char, c.text) for c in without_flag.chunks
@@ -265,7 +325,12 @@ def test_orphaned_chunk_gets_governing_heading_prepended(make_extract_document):
         "- Build: Weather CLI app using a public API\n"
     )
     document = _normalized(make_extract_document, [text])
-    config = ChunkingConfig(max_chunk_size=67, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=67,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
@@ -278,7 +343,12 @@ def test_orphaned_chunk_gets_governing_heading_prepended(make_extract_document):
 def test_chunk_opening_on_its_own_heading_gets_no_prefix(make_extract_document):
     text = "WEEK 4 OVERVIEW\n\n- item one\n\nWEEK 9 OVERVIEW\n\n- item two\n"
     document = _normalized(make_extract_document, [text])
-    config = ChunkingConfig(max_chunk_size=16, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=16,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
@@ -287,7 +357,9 @@ def test_chunk_opening_on_its_own_heading_gets_no_prefix(make_extract_document):
     assert all(c.context_prefix == "" for c in heading_chunks)
 
 
-def test_table_continuation_gets_heading_and_header_row_prepended(make_extract_document):
+def test_table_continuation_gets_heading_and_header_row_prepended(
+    make_extract_document,
+):
     text = (
         "TABLE OVERVIEW\n\n"
         "Name | Role | Score\n"
@@ -295,11 +367,20 @@ def test_table_continuation_gets_heading_and_header_row_prepended(make_extract_d
         "Bob | Manager | 85\n"
     )
     document = _normalized(make_extract_document, [text])
-    config = ChunkingConfig(max_chunk_size=55, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=55,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
-    continuation_chunks = [c for c in result.chunks if c.text.startswith("Alice") or c.text.startswith("Bob")]
+    continuation_chunks = [
+        c
+        for c in result.chunks
+        if c.text.startswith("Alice") or c.text.startswith("Bob")
+    ]
     assert continuation_chunks
     for chunk in continuation_chunks:
         assert chunk.context_prefix == "TABLE OVERVIEW\nName | Role | Score"
@@ -307,7 +388,9 @@ def test_table_continuation_gets_heading_and_header_row_prepended(make_extract_d
         assert chunk.text.count("Name | Role | Score") == 0
 
 
-def test_table_split_across_page_break_inherits_header_from_previous_page(make_extract_document):
+def test_table_split_across_page_break_inherits_header_from_previous_page(
+    make_extract_document,
+):
     # normalize_page runs per-page, so a table that continues onto the next page becomes
     # two blocks: page 1's has the header, page 2's starts straight into data rows and
     # has no header of its own (a numeric first row can never look like a header row).
@@ -318,7 +401,12 @@ def test_table_split_across_page_break_inherits_header_from_previous_page(make_e
             "Carl | North | 150\nDana | South | 175\n",
         ],
     )
-    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=40,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
@@ -338,7 +426,12 @@ def test_table_continuation_header_resets_after_non_table_block(make_extract_doc
             "This is an unrelated paragraph that closes out the section for readers today.\n\nX | Y\n1 | 2\n",
         ],
     )
-    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=40,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
@@ -350,7 +443,9 @@ def test_table_continuation_header_resets_after_non_table_block(make_extract_doc
     assert "Name | Region | Amount" not in unrelated_table_chunk.text
 
 
-def test_table_header_never_emitted_alone_when_it_cannot_share_a_chunk_with_a_row(make_extract_document):
+def test_table_header_never_emitted_alone_when_it_cannot_share_a_chunk_with_a_row(
+    make_extract_document,
+):
     # The header row alone fits under max_chunk_size, but header + even one data row does
     # not. The header must never open a chunk with zero rows attached to it - instead the
     # next row is forced in anyway, and that chunk is allowed to exceed max_chunk_size.
@@ -361,7 +456,10 @@ def test_table_header_never_emitted_alone_when_it_cannot_share_a_chunk_with_a_ro
     document = _normalized(make_extract_document, [text])
     max_chunk_size = len(header) + 5
     config = ChunkingConfig(
-        max_chunk_size=max_chunk_size, overlap_size=0, chunking_strategy="structural", propagate_context=True
+        max_chunk_size=max_chunk_size,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
     )
 
     result = chunk_document(document, config)
@@ -384,19 +482,31 @@ def test_table_header_and_row_pack_together_when_they_fit(make_extract_document)
     # needed and the chunk stays within max_chunk_size.
     text = "Name | Role | Score\nAlice | Engineer | 90\n"
     document = _normalized(make_extract_document, [text])
-    config = ChunkingConfig(max_chunk_size=1000, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=1000,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
     assert len(result.chunks) == 1
     assert result.chunks[0].text == "Name | Role | Score\nAlice | Engineer | 90"
-    assert result.chunks[0].end_char - result.chunks[0].start_char <= config.max_chunk_size
+    assert (
+        result.chunks[0].end_char - result.chunks[0].start_char <= config.max_chunk_size
+    )
 
 
 def test_no_heading_falls_back_to_previous_units_text(make_extract_document):
     text = "- alpha item\n- beta item\n- gamma item\n"
     document = _normalized(make_extract_document, [text])
-    config = ChunkingConfig(max_chunk_size=15, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=15,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
@@ -408,7 +518,12 @@ def test_no_heading_falls_back_to_previous_units_text(make_extract_document):
 def test_contextualized_text_combines_prefix_and_text(make_extract_document):
     text = "WEEK 4 OVERVIEW\n\n- item one\n- item two\n"
     document = _normalized(make_extract_document, [text])
-    config = ChunkingConfig(max_chunk_size=30, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=30,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
 
     result = chunk_document(document, config)
 
@@ -430,7 +545,10 @@ def test_context_prefix_counts_against_max_chunk_size_budget(make_extract_docume
     document = _normalized(make_extract_document, [text])
     max_chunk_size = 67
     config = ChunkingConfig(
-        max_chunk_size=max_chunk_size, overlap_size=0, chunking_strategy="structural", propagate_context=True
+        max_chunk_size=max_chunk_size,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
     )
 
     result = chunk_document(document, config)

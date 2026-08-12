@@ -3,7 +3,6 @@ import pytest
 from document_chunker.extractor import PDFExtractionError, extract_pdf
 from document_chunker.schemas import PDFDocumentInput
 
-
 # --- page coverage, ordering, blank pages ---
 
 

@@ -5,7 +5,6 @@ from pypdf import PdfWriter
 from document_chunker.loader import PDFLoadError, load_pdf
 from document_chunker.schemas import PDFDocumentInput
 
-
 # --- PDFDocumentInput ---
 
 
@@ -56,7 +55,9 @@ def test_zero_byte_file(tmp_path):
 
 def test_optional_metadata_provided(create_pdf):
     pdf_path = create_pdf("meta.pdf")
-    document = PDFDocumentInput(path=pdf_path, document_id="123-abc", document_type="invoice")
+    document = PDFDocumentInput(
+        path=pdf_path, document_id="123-abc", document_type="invoice"
+    )
     assert document.document_id == "123-abc"
     assert document.document_type == "invoice"
 

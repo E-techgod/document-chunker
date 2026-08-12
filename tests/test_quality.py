@@ -23,10 +23,14 @@ _MIXED_TEXT = (
 # --- avg utilization / tiny chunks ---
 
 
-def test_avg_utilization_is_full_for_tightly_packed_character_chunks(make_normalized_document):
+def test_avg_utilization_is_full_for_tightly_packed_character_chunks(
+    make_normalized_document,
+):
     full_text = "ABCDEFGHIJKLMNOPQ"  # 17 chars
     document = make_normalized_document([full_text], full_text=full_text)
-    config = ChunkingConfig(max_chunk_size=5, overlap_size=0, chunking_strategy="characters")
+    config = ChunkingConfig(
+        max_chunk_size=5, overlap_size=0, chunking_strategy="characters"
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -36,10 +40,14 @@ def test_avg_utilization_is_full_for_tightly_packed_character_chunks(make_normal
     assert report.avg_utilization == 0.85
 
 
-def test_tiny_chunk_ratio_flags_chunks_under_ten_percent_of_max_size(make_normalized_document):
+def test_tiny_chunk_ratio_flags_chunks_under_ten_percent_of_max_size(
+    make_normalized_document,
+):
     # Final chunk is 2 chars, well under 10% of a 100-char max - it's the only tiny one.
     document = make_normalized_document(["A" * 22], full_text="A" * 22)
-    config = ChunkingConfig(max_chunk_size=100, overlap_size=0, chunking_strategy="characters")
+    config = ChunkingConfig(
+        max_chunk_size=100, overlap_size=0, chunking_strategy="characters"
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -53,7 +61,9 @@ def test_tiny_chunk_ratio_flags_chunks_under_ten_percent_of_max_size(make_normal
 
 def test_character_strategy_splits_words_bullets_and_table_rows(make_extract_document):
     document = _normalized(make_extract_document, [_MIXED_TEXT])
-    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="characters")
+    config = ChunkingConfig(
+        max_chunk_size=40, overlap_size=0, chunking_strategy="characters"
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -63,9 +73,13 @@ def test_character_strategy_splits_words_bullets_and_table_rows(make_extract_doc
     assert report.table_row_splits > 0
 
 
-def test_structural_strategy_never_splits_words_bullets_or_table_rows(make_extract_document):
+def test_structural_strategy_never_splits_words_bullets_or_table_rows(
+    make_extract_document,
+):
     document = _normalized(make_extract_document, [_MIXED_TEXT])
-    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=40, overlap_size=0, chunking_strategy="structural"
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -79,7 +93,9 @@ def test_word_split_requires_boundary_strictly_inside_a_token(make_extract_docum
     # A boundary landing exactly on the space between two words is not a word split.
     document = _normalized(make_extract_document, ["hello world"])
     assert document.full_text == "hello world"
-    config = ChunkingConfig(max_chunk_size=5, overlap_size=0, chunking_strategy="characters")
+    config = ChunkingConfig(
+        max_chunk_size=5, overlap_size=0, chunking_strategy="characters"
+    )
     result = chunk_document(document, config)
     assert [c.text for c in result.chunks] == ["hello", " worl", "d"]
 
@@ -93,7 +109,9 @@ def test_word_split_requires_boundary_strictly_inside_a_token(make_extract_docum
 
 def test_overlap_overhead_is_zero_when_no_overlap_configured(make_normalized_document):
     document = make_normalized_document(["A" * 30], full_text="A" * 30)
-    config = ChunkingConfig(max_chunk_size=10, overlap_size=0, chunking_strategy="characters")
+    config = ChunkingConfig(
+        max_chunk_size=10, overlap_size=0, chunking_strategy="characters"
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -105,7 +123,9 @@ def test_overlap_overhead_is_zero_when_no_overlap_configured(make_normalized_doc
 
 def test_overlap_overhead_is_positive_when_overlap_configured(make_normalized_document):
     document = make_normalized_document(["A" * 30], full_text="A" * 30)
-    config = ChunkingConfig(max_chunk_size=10, overlap_size=3, chunking_strategy="characters")
+    config = ChunkingConfig(
+        max_chunk_size=10, overlap_size=3, chunking_strategy="characters"
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -115,9 +135,16 @@ def test_overlap_overhead_is_positive_when_overlap_configured(make_normalized_do
     assert report.context_coverage is None
 
 
-def test_structural_without_context_carry_has_no_overhead_and_no_coverage(make_extract_document):
+def test_structural_without_context_carry_has_no_overhead_and_no_coverage(
+    make_extract_document,
+):
     document = _normalized(make_extract_document, [_MIXED_TEXT])
-    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="structural", propagate_context=False)
+    config = ChunkingConfig(
+        max_chunk_size=40,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=False,
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -127,9 +154,16 @@ def test_structural_without_context_carry_has_no_overhead_and_no_coverage(make_e
     assert report.context_coverage is None
 
 
-def test_structural_with_context_carry_reports_overhead_and_full_coverage(make_extract_document):
+def test_structural_with_context_carry_reports_overhead_and_full_coverage(
+    make_extract_document,
+):
     document = _normalized(make_extract_document, [_MIXED_TEXT])
-    config = ChunkingConfig(max_chunk_size=40, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=40,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -145,7 +179,9 @@ def test_structural_with_context_carry_reports_overhead_and_full_coverage(make_e
 
 def test_is_valid_reflects_validate_chunks(make_normalized_document):
     document = make_normalized_document(["ABCDEFGHIJKL"], full_text="ABCDEFGHIJKL")
-    config = ChunkingConfig(max_chunk_size=5, overlap_size=2, chunking_strategy="characters")
+    config = ChunkingConfig(
+        max_chunk_size=5, overlap_size=2, chunking_strategy="characters"
+    )
     result = chunk_document(document, config)
 
     report = evaluate_chunk_quality(document, result, config)
@@ -156,7 +192,9 @@ def test_is_valid_reflects_validate_chunks(make_normalized_document):
 # --- comparison table formatting ---
 
 
-def test_format_quality_comparison_includes_every_metric_and_label(make_extract_document):
+def test_format_quality_comparison_includes_every_metric_and_label(
+    make_extract_document,
+):
     document = _normalized(make_extract_document, [_MIXED_TEXT])
     reports = {}
     for label, strategy, propagate in [
@@ -177,7 +215,13 @@ def test_format_quality_comparison_includes_every_metric_and_label(make_extract_
 
     for label in reports:
         assert label in table
-    for metric in ["Valid", "Chunks", "Avg utilization", "Tiny chunks", "Context coverage"]:
+    for metric in [
+        "Valid",
+        "Chunks",
+        "Avg utilization",
+        "Tiny chunks",
+        "Context coverage",
+    ]:
         assert metric in table
     assert "N/A" in table  # V1 and V2.1 have no context-coverage mechanism
     assert "*" in table  # V1's overlap-based overhead is footnoted

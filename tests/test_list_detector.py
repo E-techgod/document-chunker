@@ -1,6 +1,5 @@
 from document_chunker.list_detector import is_continuation_line, match_list_item
 
-
 # --- marker recognition and prefix stripping ---
 
 
@@ -63,7 +62,9 @@ def test_marker_must_be_at_line_start():
 
 
 def test_deeper_indented_line_is_a_continuation():
-    assert is_continuation_line("      wrapped continuation text", marker_indent=4) is True
+    assert (
+        is_continuation_line("      wrapped continuation text", marker_indent=4) is True
+    )
 
 
 def test_same_indent_as_marker_is_still_a_continuation():

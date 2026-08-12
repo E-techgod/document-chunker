@@ -1,19 +1,23 @@
 import sys
 from pathlib import Path
+
 from pydantic import ValidationError
 
+from src.document_chunker.chunker import chunk_document
+from src.document_chunker.chunking_strategies import (
+    describe_chunking,
+    get_chunking_strategy,
+)
+from src.document_chunker.evaluator import validate_chunks
 from src.document_chunker.extractor import PDFExtractionError, extract_pdf
 from src.document_chunker.loader import PDFLoadError, load_pdf
-from src.document_chunker.schemas import PDFDocumentInput
-from src.document_chunker.normalizer import normalize_text
 from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.schemas import PDFDocumentInput
 from src.document_chunker.step2_pipeline import validate_structured_document
 from src.document_chunker.structured_bridge import to_normalized_document
-from src.document_chunker.counting import count_words
-from src.document_chunker.chunker import chunk_document
-from src.document_chunker.evaluator import validate_chunks
-from src.document_chunker.chunking_strategies import get_chunking_strategy, describe_chunking
-ACTIVE_CHUNKING_STRATEGY = "v2.2" # v1.0: character chunking with overlap, v2.1: structural chunking with no context carry, v2.2: structural chunking with context carry
+
+ACTIVE_CHUNKING_STRATEGY = "v2.2"  # v1.0: character chunking with overlap, v2.1: structural chunking with no context carry, v2.2: structural chunking with context carry
+
 
 def main() -> None:
     # Use CLI argument if provided; otherwise, fall back to default path
@@ -59,7 +63,9 @@ def main() -> None:
         # test_known_limitation_pipe_separated_labels_can_misdetect_as_a_table) can trip
         # the lossless-content invariant without indicating an actual noise-detection or
         # bridging bug. Surfaced as a warning rather than aborting the run.
-        print(f"Step 2 structured normalization warnings: {len(step2_issues)} issue(s) found.")
+        print(
+            f"Step 2 structured normalization warnings: {len(step2_issues)} issue(s) found."
+        )
         for issue in step2_issues:
             print(f"  {issue}")
 
@@ -81,9 +87,7 @@ def main() -> None:
     print(f"Total normalized chars: {normalized.char_count}\n")"""
 
     chunker = chunk_document(normalized, config=chunking_config)
-    print(
-        f"Chunking strategy: {ACTIVE_CHUNKING_STRATEGY} ({strategy_label})"
-    )
+    print(f"Chunking strategy: {ACTIVE_CHUNKING_STRATEGY} ({strategy_label})")
     print(
         "Chunking config: "
         f"strategy={chunking_config.chunking_strategy}, "
@@ -94,9 +98,15 @@ def main() -> None:
     print(
         f"Chunking complete: Document split into {describe_chunking(chunking_config)}."
     )
-    print(f"Chunk-covered spans in full_text: {[(chunk.start_char, chunk.end_char) for chunk in chunker.chunks]}")
-    print(f"Whitespace-only chunks (should be empty): {[chunk for chunk in chunker.chunks if not chunk.text.strip()]}")
-    print(f"Non-whitespace content lost (should be empty): {normalized.full_text[0:chunker.chunks[0].start_char]}{normalized.full_text[chunker.chunks[-1].end_char:]}")
+    print(
+        f"Chunk-covered spans in full_text: {[(chunk.start_char, chunk.end_char) for chunk in chunker.chunks]}"
+    )
+    print(
+        f"Whitespace-only chunks (should be empty): {[chunk for chunk in chunker.chunks if not chunk.text.strip()]}"
+    )
+    print(
+        f"Non-whitespace content lost (should be empty): {normalized.full_text[0:chunker.chunks[0].start_char]}{normalized.full_text[chunker.chunks[-1].end_char:]}"
+    )
     print(f"Total chunks created: {len(chunker.chunks)}")
     for chunk in chunker.chunks:
         print(
@@ -106,7 +116,7 @@ def main() -> None:
 
     for chunk in chunker.chunks[:6]:
         print(
-           f" ----------------------------------------------------------------------- Chunk {chunk.chunk_index} ----------------------------------------------------------------------- "
+            f" ----------------------------------------------------------------------- Chunk {chunk.chunk_index} ----------------------------------------------------------------------- "
         )
         if chunk.context_prefix:
             print(f"[context]\n{chunk.context_prefix}")
@@ -124,7 +134,9 @@ def main() -> None:
     else:
         print(f"Chunk validation FAILED: {len(report.issues)} issue(s) found.")
         for issue in report.issues:
-            print(f"  [{issue.invariant}] chunk_index={issue.chunk_index}: {issue.message}")
+            print(
+                f"  [{issue.invariant}] chunk_index={issue.chunk_index}: {issue.message}"
+            )
         sys.exit(1)
 
     """ Saftery Checks for the extracted document to ensure consistency and correctness.
@@ -157,8 +169,6 @@ def main() -> None:
     assert normalize_document(normalized).full_text
     """
 
+
 if __name__ == "__main__":
     main()
-
-
-    

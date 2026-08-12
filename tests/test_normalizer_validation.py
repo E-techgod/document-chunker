@@ -8,7 +8,10 @@ from document_chunker.extractor import extract_pdf
 from document_chunker.loader import load_pdf
 from document_chunker.paragraph_normalizer import build_structured_document
 from document_chunker.schemas import ExtractedDocument, ExtractedPage, PDFDocumentInput
-from document_chunker.step2_pipeline import normalize_document, validate_structured_document
+from document_chunker.step2_pipeline import (
+    normalize_document,
+    validate_structured_document,
+)
 from document_chunker.structured_models import (
     HeadingBlock,
     ListBlock,
@@ -28,7 +31,9 @@ def _extract(pdf_name: str) -> ExtractedDocument:
 
 
 def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:
-    pages = [ExtractedPage(page_number=i, text=text) for i, text in enumerate(texts, start=1)]
+    pages = [
+        ExtractedPage(page_number=i, text=text) for i, text in enumerate(texts, start=1)
+    ]
     return ExtractedDocument(
         document_id=document_id,
         file_name=f"{document_id}.pdf",
@@ -115,7 +120,8 @@ def test_invariant_span_equality_detects_a_synthetic_violation():
 
 def test_invariant_lossless_content_holds_on_synthetic_document():
     issues = validate_structured_document(
-        build_structured_document(MULTI_PAGE_MIXED_DOCUMENT), source=MULTI_PAGE_MIXED_DOCUMENT
+        build_structured_document(MULTI_PAGE_MIXED_DOCUMENT),
+        source=MULTI_PAGE_MIXED_DOCUMENT,
     )
     assert issues == []
 
@@ -185,7 +191,9 @@ def test_noise_flagged_footer_is_emitted_separately_not_embedded_in_table_text()
         if not isinstance(block, TableBlock):
             continue
         assert footer not in block.text
-        assert all(footer not in cell for row in [block.columns, *block.rows] for cell in row)
+        assert all(
+            footer not in cell for row in [block.columns, *block.rows] for cell in row
+        )
 
 
 # --- Invariant 5: table rectangularity ---
@@ -240,7 +248,9 @@ def test_invariant_json_serialization_round_trips_without_mutation():
 
 
 def test_invariant_json_serialization_holds_in_the_validator():
-    issues = validate_structured_document(build_structured_document(MULTI_PAGE_MIXED_DOCUMENT))
+    issues = validate_structured_document(
+        build_structured_document(MULTI_PAGE_MIXED_DOCUMENT)
+    )
     assert not any("serialize" in issue or "mutated" in issue for issue in issues)
 
 
@@ -261,7 +271,9 @@ def test_to_dict_requires_no_disk_io(tmp_path, monkeypatch):
 def test_normalize_document_returns_a_validated_structured_document():
     structured = normalize_document(MULTI_PAGE_MIXED_DOCUMENT)
     assert isinstance(structured, StructuredNormalizedDocument)
-    assert validate_structured_document(structured, source=MULTI_PAGE_MIXED_DOCUMENT) == []
+    assert (
+        validate_structured_document(structured, source=MULTI_PAGE_MIXED_DOCUMENT) == []
+    )
 
 
 def test_normalize_document_raises_with_all_violations_when_invalid(monkeypatch):
@@ -286,7 +298,9 @@ def test_golden_rows_hold_through_the_full_validated_pipeline():
     structured = build_structured_document(extracted)
 
     top_industries = next(
-        b for b in structured.blocks if isinstance(b, TableBlock) and any("Technology" in row[0] for row in b.rows)
+        b
+        for b in structured.blocks
+        if isinstance(b, TableBlock) and any("Technology" in row[0] for row in b.rows)
     )
     technology_row = next(row for row in top_industries.rows if row[0] == "Technology")
     assert list(technology_row) == [
@@ -294,7 +308,9 @@ def test_golden_rows_hold_through_the_full_validated_pipeline():
         "46%",
         "Foundation models, search, recommendations, developer tools",
     ]
-    manufacturing_row = next(row for row in top_industries.rows if "Manufacturing" in row[0])
+    manufacturing_row = next(
+        row for row in top_industries.rows if "Manufacturing" in row[0]
+    )
     assert list(manufacturing_row) == [
         "Manufacturing / Auto",
         "6%",
@@ -302,7 +318,9 @@ def test_golden_rows_hold_through_the_full_validated_pipeline():
     ]
 
     salary_table = next(
-        b for b in structured.blocks if isinstance(b, TableBlock) and any("Junior" in row[0] for row in b.rows)
+        b
+        for b in structured.blocks
+        if isinstance(b, TableBlock) and any("Junior" in row[0] for row in b.rows)
     )
     mid_level_row = next(row for row in salary_table.rows if "Mid-Level" in row[0])
     assert list(mid_level_row) == [
@@ -318,7 +336,16 @@ def test_golden_rows_hold_through_the_full_validated_pipeline():
 
 @pytest.mark.parametrize(
     "pdf_name",
-    ["BAWSE.pdf", "generic.pdf", "invoice.pdf", "receipt.pdf", "report.pdf", "resume.pdf", "sample.pdf", "empty.pdf"],
+    [
+        "BAWSE.pdf",
+        "generic.pdf",
+        "invoice.pdf",
+        "receipt.pdf",
+        "report.pdf",
+        "resume.pdf",
+        "sample.pdf",
+        "empty.pdf",
+    ],
 )
 def test_core_span_and_structural_invariants_hold_on_real_documents(pdf_name):
     """Invariants 1, 2, 3, 5, 6, 7 across the real fixture PDFs. Lossless-content
@@ -338,17 +365,30 @@ def test_core_span_and_structural_invariants_hold_on_real_documents(pdf_name):
 def test_pipe_separated_prose_is_no_longer_misdetected_as_a_table():
     """This used to document a known limitation: two unrelated pipe-separated lines on
     BAWSE.pdf page 1 were glued into a fake 2-row table. The 2-row coherence check now
-    rejects that weakest-evidence case so the lines remain ordinary paragraph content."""
+    rejects that weakest-evidence case so the lines remain ordinary paragraph content.
+    """
     extracted = _extract("BAWSE.pdf")
     structured = build_structured_document(extracted)
 
     issues = validate_structured_document(structured, source=extracted)
     assert issues == []
 
-    paragraph_texts = [block.text for block in structured.blocks if isinstance(block, ParagraphBlock)]
-    table_texts = [block.text for block in structured.blocks if isinstance(block, TableBlock)]
+    paragraph_texts = [
+        block.text for block in structured.blocks if isinstance(block, ParagraphBlock)
+    ]
+    table_texts = [
+        block.text for block in structured.blocks if isinstance(block, TableBlock)
+    ]
 
-    assert any("Leverage Play" in text and "domain knowledge" in text for text in paragraph_texts)
-    assert any("Updated June 2026" in text and "BASWE LLC" in text for text in paragraph_texts)
+    assert any(
+        "Leverage Play" in text and "domain knowledge" in text
+        for text in paragraph_texts
+    )
+    assert any(
+        "Updated June 2026" in text and "BASWE LLC" in text for text in paragraph_texts
+    )
     assert all("Leverage Play | domain knowledge" not in text for text in table_texts)
-    assert all("Updated June 2026 | baswe.Ai Engineer Accelerator™ | BASWE LLC" not in text for text in table_texts)
+    assert all(
+        "Updated June 2026 | baswe.Ai Engineer Accelerator™ | BASWE LLC" not in text
+        for text in table_texts
+    )

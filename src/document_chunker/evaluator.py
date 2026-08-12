@@ -57,7 +57,9 @@ def _check_max_size(
     # atomic element/sentence that was itself too big to split further, or a table
     # header row forced to pair with its first data row (header_pairs) - never when
     # several elements were packed together by choice.
-    oversized_pieces = {(start, end) for start, end in pieces if end - start > config.max_chunk_size}
+    oversized_pieces = {
+        (start, end) for start, end in pieces if end - start > config.max_chunk_size
+    }
     oversized_pieces |= set(header_pairs)
     issues = []
     for chunk in chunks:
@@ -79,7 +81,9 @@ def _check_max_size(
     return issues
 
 
-def _check_overlap(chunks: list[DocumentChunk], config: ChunkingConfig) -> list[ChunkValidationIssue]:
+def _check_overlap(
+    chunks: list[DocumentChunk], config: ChunkingConfig
+) -> list[ChunkValidationIssue]:
     issues = []
     for current, following in zip(chunks, chunks[1:]):
         is_full_sized = (current.end_char - current.start_char) == config.max_chunk_size
@@ -106,7 +110,9 @@ def _check_overlap(chunks: list[DocumentChunk], config: ChunkingConfig) -> list[
     return issues
 
 
-def _check_non_whitespace_coverage(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
+def _check_non_whitespace_coverage(
+    full_text: str, chunks: list[DocumentChunk]
+) -> list[ChunkValidationIssue]:
     """Any source region not covered by a chunk must contain only whitespace."""
     issues = []
     spans = sorted((chunk.start_char, chunk.end_char) for chunk in chunks)
@@ -137,7 +143,9 @@ def _check_non_whitespace_coverage(full_text: str, chunks: list[DocumentChunk]) 
     return issues
 
 
-def _check_traceability(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
+def _check_traceability(
+    full_text: str, chunks: list[DocumentChunk]
+) -> list[ChunkValidationIssue]:
     issues = []
     for chunk in chunks:
         if full_text[chunk.start_char : chunk.end_char] != chunk.text:
@@ -151,7 +159,9 @@ def _check_traceability(full_text: str, chunks: list[DocumentChunk]) -> list[Chu
     return issues
 
 
-def _check_offsets(full_text: str, chunks: list[DocumentChunk]) -> list[ChunkValidationIssue]:
+def _check_offsets(
+    full_text: str, chunks: list[DocumentChunk]
+) -> list[ChunkValidationIssue]:
     issues = []
     text_length = len(full_text)
     previous_start: int | None = None
@@ -221,7 +231,11 @@ def _check_atomic_element_coverage(
     for start, end in elements:
         if end <= start or end - start > max_chunk_size:
             continue
-        containing = [chunk for chunk in chunks if chunk.start_char <= start and end <= chunk.end_char]
+        containing = [
+            chunk
+            for chunk in chunks
+            if chunk.start_char <= start and end <= chunk.end_char
+        ]
         if len(containing) != 1:
             issues.append(
                 ChunkValidationIssue(
@@ -292,7 +306,9 @@ def validate_chunks(
     if is_structural:
         issues += [
             *_check_element_order(elements),
-            *_check_atomic_element_coverage(elements, result.chunks, config.max_chunk_size),
+            *_check_atomic_element_coverage(
+                elements, result.chunks, config.max_chunk_size
+            ),
             *_check_structural_integrity(pieces, result.chunks),
         ]
     return ChunkValidationReport(document_id=document.document_id, issues=issues)

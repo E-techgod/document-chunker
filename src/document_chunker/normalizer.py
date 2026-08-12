@@ -1,19 +1,20 @@
 import re
 from dataclasses import dataclass
 
-from document_chunker.counting import count_words
 from document_chunker.schemas import (
-    ExtractedPage,
     ExtractedDocument,
+    ExtractedPage,
+    NormalizationStrategy,
     NormalizedBlock,
     NormalizedDocument,
     NormalizedPage,
     NormalizedTable,
-    NormalizationStrategy,
 )
 
 # NBSP + the Unicode "space separator" block (en/em/thin/hair/ideographic spaces, etc.)
-_NON_BREAKING_SPACE_RE = re.compile("[\u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000]")
+_NON_BREAKING_SPACE_RE = re.compile(
+    "[\u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000]"
+)
 # Zero-width space/joiners, left/right-to-left marks, BOM, soft hyphen.
 _INVISIBLE_CHAR_RE = re.compile("[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad]")
 _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -25,7 +26,9 @@ _SPACE_AFTER_OPEN_BRACKET_RE = re.compile(r"([(\[{])[ \t]+")
 _LIST_ITEM_RE = re.compile(r"^(?:[●•\-→]|\d+[.)])\s+")
 _NUMERIC_ROW_RE = re.compile(r"^[\d$€£¥(),.%+\-/: ]+$")
 _SENTENCE_TERMINAL_RE = re.compile(r'[.!?]["\')\]]?$')
-_WRAP_CONTINUATION_END_RE = re.compile(r"(?:,|[&/\-–—]|(?:\b(?:and|or|but|nor|yet|so|for)\b))$", re.IGNORECASE)
+_WRAP_CONTINUATION_END_RE = re.compile(
+    r"(?:,|[&/\-–—]|(?:\b(?:and|or|but|nor|yet|so|for)\b))$", re.IGNORECASE
+)
 _PIPE_SPLIT_TABLE_RE = re.compile(r"\s*\|\s*")
 _WHITESPACE_SPLIT_TABLE_RE = re.compile(r"\s{2,}")
 # A numbered section label followed by more title text, e.g. "Week 4: Git, GitHub & APIs"
@@ -33,6 +36,7 @@ _WHITESPACE_SPLIT_TABLE_RE = re.compile(r"\s{2,}")
 _NUMBERED_LABEL_HEADING_RE = re.compile(r"^[A-Z][A-Za-z]*\s+[0-9]+[A-Za-z]*\s*:\s+\S")
 
 DEFAULT_NORMALIZATION_STRATEGY: NormalizationStrategy = "structural"
+
 
 @dataclass(frozen=True)
 class ClassifiedLine:
@@ -85,7 +89,22 @@ def _is_title_cased_short_line(text: str) -> bool:
     if len(words) < 2:
         return False
 
-    lowercase_allowed = {"a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"}
+    lowercase_allowed = {
+        "a",
+        "an",
+        "and",
+        "as",
+        "at",
+        "by",
+        "for",
+        "in",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "with",
+    }
     clause_like_words = {
         "am",
         "are",
@@ -131,9 +150,7 @@ def _is_title_cased_short_line(text: str) -> bool:
 
     title_like = 0
     for word in words:
-        if word.lower() in lowercase_allowed:
-            title_like += 1
-        elif word[:1].isupper() and word[1:] == word[1:].lower():
+        if word.lower() in lowercase_allowed or word[:1].isupper() and word[1:] == word[1:].lower():
             title_like += 1
     return title_like >= max(2, len(words) - 1)
 
@@ -172,7 +189,11 @@ def _is_table_candidate(text: str) -> bool:
     columns = _split_table_columns(text)
     if len(columns) < 2:
         return False
-    compact_columns = sum(1 for column in columns if len(column.split()) <= 4 or _NUMERIC_ROW_RE.match(column))
+    compact_columns = sum(
+        1
+        for column in columns
+        if len(column.split()) <= 4 or _NUMERIC_ROW_RE.match(column)
+    )
     return compact_columns >= 1
 
 
@@ -193,7 +214,9 @@ def _classify_line(text: str) -> ClassifiedLine:
             raw_text=text,
         )
     if _is_table_candidate(stripped):
-        return ClassifiedLine(text=stripped, line_type="table_row", indent=indent, raw_text=text)
+        return ClassifiedLine(
+            text=stripped, line_type="table_row", indent=indent, raw_text=text
+        )
     if _is_heading_like(stripped):
         return ClassifiedLine(
             text=_normalize_inline_text(stripped),
@@ -216,7 +239,9 @@ def _classify_line(text: str) -> ClassifiedLine:
     )
 
 
-def _should_join_with_next(current: ClassifiedLine, following: ClassifiedLine | None) -> bool:
+def _should_join_with_next(
+    current: ClassifiedLine, following: ClassifiedLine | None
+) -> bool:
     if following is None:
         return False
     if current.line_type != "text" or following.line_type != "text":
@@ -226,7 +251,9 @@ def _should_join_with_next(current: ClassifiedLine, following: ClassifiedLine | 
     return _has_paragraph_join_signal(current, following)
 
 
-def _has_strong_paragraph_stop(current: ClassifiedLine, following: ClassifiedLine) -> bool:
+def _has_strong_paragraph_stop(
+    current: ClassifiedLine, following: ClassifiedLine
+) -> bool:
     if _SENTENCE_TERMINAL_RE.search(current.text):
         return True
     if following.text[:1].isdigit():
@@ -238,7 +265,9 @@ def _has_strong_paragraph_stop(current: ClassifiedLine, following: ClassifiedLin
     return False
 
 
-def _has_paragraph_join_signal(current: ClassifiedLine, following: ClassifiedLine) -> bool:
+def _has_paragraph_join_signal(
+    current: ClassifiedLine, following: ClassifiedLine
+) -> bool:
     if not _starts_like_paragraph_continuation(following):
         return False
     if _WRAP_CONTINUATION_END_RE.search(current.text):
@@ -257,7 +286,9 @@ def _has_paragraph_join_signal(current: ClassifiedLine, following: ClassifiedLin
 
 
 def _starts_like_paragraph_continuation(line: ClassifiedLine) -> bool:
-    return bool(line.text[:1]) and (line.text[:1].isalnum() or line.text[:1] in {"(", '"', "'"})
+    return bool(line.text[:1]) and (
+        line.text[:1].isalnum() or line.text[:1] in {"(", '"', "'"}
+    )
 
 
 def _following_starts_lowercase(line: ClassifiedLine) -> bool:
@@ -273,12 +304,16 @@ def _looks_like_short_lowercase_fragment(line: ClassifiedLine) -> bool:
     return 1 <= len(words) <= 2 and line.text[:1].islower()
 
 
-def _looks_like_wrapped_fragment(current: ClassifiedLine, following: ClassifiedLine) -> bool:
+def _looks_like_wrapped_fragment(
+    current: ClassifiedLine, following: ClassifiedLine
+) -> bool:
     current_words = current.text.split()
     following_words = following.text.split()
     if len(current_words) > 2 or len(following_words) > 3:
         return False
-    if _looks_like_section_label(current.text) or _looks_like_section_label(following.text):
+    if _looks_like_section_label(current.text) or _looks_like_section_label(
+        following.text
+    ):
         return False
     return any(char.islower() for char in following.text[1:]) or current.text.isupper()
 
@@ -303,9 +338,15 @@ def _split_table_columns(
     allow_token_fallback: bool = True,
 ) -> list[str]:
     if "|" in text:
-        columns = [segment for segment in _PIPE_SPLIT_TABLE_RE.split(text) if segment.strip()]
+        columns = [
+            segment for segment in _PIPE_SPLIT_TABLE_RE.split(text) if segment.strip()
+        ]
     else:
-        columns = [segment for segment in _WHITESPACE_SPLIT_TABLE_RE.split(text) if segment.strip()]
+        columns = [
+            segment
+            for segment in _WHITESPACE_SPLIT_TABLE_RE.split(text)
+            if segment.strip()
+        ]
 
     normalized_columns = [_normalize_inline_text(segment) for segment in columns]
     if expected_columns is None or len(normalized_columns) == expected_columns:
@@ -314,7 +355,9 @@ def _split_table_columns(
     if not allow_token_fallback:
         return normalized_columns
 
-    fallback_columns = [_normalize_inline_text(segment) for segment in text.split() if segment.strip()]
+    fallback_columns = [
+        _normalize_inline_text(segment) for segment in text.split() if segment.strip()
+    ]
     if len(fallback_columns) == expected_columns:
         return fallback_columns
 
@@ -346,14 +389,18 @@ def _looks_like_header_row(first_row: list[str], body_rows: list[list[str]]) -> 
     if not all(len(cell.split()) <= 6 for cell in first_row):
         return False
 
-    comparable_body_rows = [row for row in body_rows if abs(len(row) - len(first_row)) <= 1]
+    comparable_body_rows = [
+        row for row in body_rows if abs(len(row) - len(first_row)) <= 1
+    ]
     if not comparable_body_rows:
         return False
 
     return any(_row_contains_numeric_cell(row) for row in comparable_body_rows)
 
 
-def _parse_table_row(line: ClassifiedLine, expected_columns: int | None = None) -> list[str]:
+def _parse_table_row(
+    line: ClassifiedLine, expected_columns: int | None = None
+) -> list[str]:
     row = _split_table_columns(
         line.text,
         expected_columns=expected_columns,
@@ -410,7 +457,9 @@ def _looks_like_table_continuation(
     return any(_WRAP_CONTINUATION_END_RE.search(cell) for cell in previous_row)
 
 
-def _build_table(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock | None, int]:
+def _build_table(
+    lines: list[ClassifiedLine], start_index: int
+) -> tuple[NormalizedBlock | None, int]:
     """Row/cell reconstruction for a table region is delegated to TableNormalizer (see
     table_normalizer.py) - a physical line is not necessarily a table row, so that module
     owns detecting the header/column count, merging wrapped cell lines back into the
@@ -422,7 +471,9 @@ def _build_table(lines: list[ClassifiedLine], start_index: int) -> tuple[Normali
     return TableNormalizer().build(lines, start_index)
 
 
-def _build_paragraph(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock, int]:
+def _build_paragraph(
+    lines: list[ClassifiedLine], start_index: int
+) -> tuple[NormalizedBlock, int]:
     parts = [lines[start_index].text]
     index = start_index
 
@@ -450,7 +501,9 @@ def _render_table_block(table: NormalizedTable) -> str:
     return "\n".join(rows)
 
 
-def _render_blocks(block_entries: list[BlockEntry]) -> tuple[str, list[NormalizedBlock]]:
+def _render_blocks(
+    block_entries: list[BlockEntry],
+) -> tuple[str, list[NormalizedBlock]]:
     rendered = ""
     previous_type: str | None = None
     positioned_blocks: list[NormalizedBlock] = []
@@ -479,7 +532,9 @@ def _render_blocks(block_entries: list[BlockEntry]) -> tuple[str, list[Normalize
         else:
             start = end = len(rendered)
 
-        positioned_blocks.append(block.model_copy(update={"start_char": start, "end_char": end}))
+        positioned_blocks.append(
+            block.model_copy(update={"start_char": start, "end_char": end})
+        )
         previous_type = block.block_type
 
     stripped = rendered.strip()
@@ -487,7 +542,9 @@ def _render_blocks(block_entries: list[BlockEntry]) -> tuple[str, list[Normalize
     final_blocks = [
         block.model_copy(
             update={
-                "start_char": min(max(block.start_char - leading_trim, 0), len(stripped)),
+                "start_char": min(
+                    max(block.start_char - leading_trim, 0), len(stripped)
+                ),
                 "end_char": min(max(block.end_char - leading_trim, 0), len(stripped)),
             }
         )
@@ -496,7 +553,9 @@ def _render_blocks(block_entries: list[BlockEntry]) -> tuple[str, list[Normalize
     return stripped, final_blocks
 
 
-def _build_list(lines: list[ClassifiedLine], start_index: int) -> tuple[NormalizedBlock, int]:
+def _build_list(
+    lines: list[ClassifiedLine], start_index: int
+) -> tuple[NormalizedBlock, int]:
     items: list[str] = []
     index = start_index
 
@@ -611,7 +670,9 @@ def normalize_document(
     pages = [normalize_page(page) for page in document.pages]
     # Joining across a blank page produces "\n\n" + "" + "\n\n" (4 newlines);
     # collapse those back down so the combined text keeps rule 6/8's limit too.
-    full_text = _EXCESS_BLANK_LINES_RE.sub("\n\n", "\n\n".join(page.text for page in pages))
+    full_text = _EXCESS_BLANK_LINES_RE.sub(
+        "\n\n", "\n\n".join(page.text for page in pages)
+    )
 
     return NormalizedDocument(
         document_id=document.document_id,

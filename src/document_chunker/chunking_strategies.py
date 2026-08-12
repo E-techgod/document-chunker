@@ -30,6 +30,7 @@ CHUNKING_STRATEGIES = {
     },
 }
 
+
 def get_chunking_strategy(strategy_name: str) -> tuple[str, ChunkingConfig]:
     strategy = CHUNKING_STRATEGIES.get(strategy_name)
     if strategy is None:

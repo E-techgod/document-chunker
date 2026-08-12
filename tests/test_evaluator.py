@@ -1,4 +1,3 @@
-import pytest
 
 from document_chunker.chunker import chunk_document
 from document_chunker.evaluator import (
@@ -23,7 +22,6 @@ from document_chunker.schemas import (
     NormalizedPage,
 )
 
-
 # --- valid chunkings pass cleanly ---
 
 
@@ -39,7 +37,9 @@ def test_valid_chunking_from_chunk_document_has_no_issues(make_normalized_docume
     assert report.document_id == document.document_id
 
 
-def test_valid_chunking_with_skipped_whitespace_chunk_has_no_issues(make_normalized_document):
+def test_valid_chunking_with_skipped_whitespace_chunk_has_no_issues(
+    make_normalized_document,
+):
     full_text = "AAAAA" + " " * 10 + "BBBBB"
     document = make_normalized_document(["AAAAA", "BBBBB"], full_text=full_text)
     config = ChunkingConfig(max_chunk_size=5, overlap_size=0)
@@ -106,15 +106,21 @@ def test_oversized_chunk_is_flagged(make_normalized_document):
     assert any(issue.invariant == MAX_SIZE for issue in report.issues)
 
 
-def test_oversized_chunk_is_not_flagged_under_structural_strategy(make_extract_document):
+def test_oversized_chunk_is_not_flagged_under_structural_strategy(
+    make_extract_document,
+):
     # The structural strategy treats max_chunk_size as a soft target: a single
     # unsplittable element (e.g. one long run-on sentence, no punctuation to split on)
     # may legitimately overflow it.
     text = ("word " * 40).strip() + "."
     document = normalize_document(make_extract_document([text]))
-    config = ChunkingConfig(max_chunk_size=50, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=50, overlap_size=0, chunking_strategy="structural"
+    )
     result = chunk_document(document, config)
-    assert len(result.chunks) == 1  # sanity check: the whole thing stayed one oversized chunk
+    assert (
+        len(result.chunks) == 1
+    )  # sanity check: the whole thing stayed one oversized chunk
     assert len(result.chunks[0].text) > config.max_chunk_size
 
     report = validate_chunks(document, result, config)
@@ -131,7 +137,9 @@ def test_oversized_chunk_from_multiple_packed_elements_is_still_flagged_under_st
     text = "- first item\n- second item"
     document = normalize_document(make_extract_document([text]))
     # Both items are well under 20 chars, so neither is individually oversized.
-    config = ChunkingConfig(max_chunk_size=20, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=20, overlap_size=0, chunking_strategy="structural"
+    )
     result = ChunkingResult(
         document_id=document.document_id,
         file_name=document.file_name,
@@ -157,7 +165,9 @@ def test_oversized_chunk_from_multiple_packed_elements_is_still_flagged_under_st
     assert any(issue.invariant == MAX_SIZE for issue in report.issues)
 
 
-def test_forced_table_header_row_pair_is_not_flagged_under_context_propagation(make_extract_document):
+def test_forced_table_header_row_pair_is_not_flagged_under_context_propagation(
+    make_extract_document,
+):
     # A table header row that can't share a chunk with even one row gets forced to pair
     # with the next row anyway (see chunker._pack_table_run), rather than ever being
     # emitted alone. That forced pair is a legitimate oversized exception, like a single
@@ -166,11 +176,16 @@ def test_forced_table_header_row_pair_is_not_flagged_under_context_propagation(m
     text = f"{header}\n1 | 2 | 3\n4 | 5 | 6\n"
     document = normalize_document(make_extract_document([text]))
     config = ChunkingConfig(
-        max_chunk_size=len(header) + 5, overlap_size=0, chunking_strategy="structural", propagate_context=True
+        max_chunk_size=len(header) + 5,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
     )
     result = chunk_document(document, config)
     forced_chunk = next(c for c in result.chunks if c.text.startswith(header))
-    assert (forced_chunk.end_char - forced_chunk.start_char) > config.max_chunk_size  # sanity check
+    assert (
+        forced_chunk.end_char - forced_chunk.start_char
+    ) > config.max_chunk_size  # sanity check
 
     report = validate_chunks(document, result, config)
 
@@ -178,12 +193,19 @@ def test_forced_table_header_row_pair_is_not_flagged_under_context_propagation(m
     assert not any(issue.invariant == MAX_SIZE for issue in report.issues)
 
 
-def test_oversized_multi_row_table_chunk_is_still_flagged_under_context_propagation(make_extract_document):
+def test_oversized_multi_row_table_chunk_is_still_flagged_under_context_propagation(
+    make_extract_document,
+):
     # A chunk spanning a header plus two rows, when header+first-row alone would already
     # have fit, is not a legitimate forced pairing - it's still a bug and must be flagged.
     text = "X | Y\n1 | 2\n3 | 4\n"
     document = normalize_document(make_extract_document([text]))
-    config = ChunkingConfig(max_chunk_size=10, overlap_size=0, chunking_strategy="structural", propagate_context=True)
+    config = ChunkingConfig(
+        max_chunk_size=10,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
     result = ChunkingResult(
         document_id=document.document_id,
         file_name=document.file_name,
@@ -212,7 +234,9 @@ def test_oversized_multi_row_table_chunk_is_still_flagged_under_context_propagat
 # --- invariant 3: correct overlap ---
 
 
-def test_wrong_overlap_between_adjacent_full_sized_chunks_is_flagged(make_normalized_document):
+def test_wrong_overlap_between_adjacent_full_sized_chunks_is_flagged(
+    make_normalized_document,
+):
     full_text = "ABCDEFGHIJKL"
     document = make_normalized_document(["ABCDEFGHIJKL"], full_text=full_text)
     config = ChunkingConfig(max_chunk_size=5, overlap_size=2)
@@ -251,7 +275,9 @@ def test_wrong_overlap_between_adjacent_full_sized_chunks_is_flagged(make_normal
     assert any(issue.invariant == OVERLAP for issue in report.issues)
 
 
-def test_overlap_not_checked_across_a_skipped_whitespace_chunk(make_normalized_document):
+def test_overlap_not_checked_across_a_skipped_whitespace_chunk(
+    make_normalized_document,
+):
     # With overlap_size=0 and a 10-char whitespace gap, chunk_document skips two
     # whitespace-only spans, leaving a real gap between the "AAAAA" and "BBBBB"
     # chunks in the output. That gap must not be held to the overlap formula.
@@ -298,7 +324,9 @@ def test_missing_non_whitespace_coverage_is_flagged(make_normalized_document):
     assert any(issue.invariant == NON_WHITESPACE_COVERAGE for issue in report.issues)
 
 
-def test_whitespace_only_gap_is_not_flagged_as_missing_coverage(make_normalized_document):
+def test_whitespace_only_gap_is_not_flagged_as_missing_coverage(
+    make_normalized_document,
+):
     full_text = "AAAAA" + " " * 10 + "BBBBB"
     document = make_normalized_document(["AAAAA", "BBBBB"], full_text=full_text)
     config = ChunkingConfig(max_chunk_size=5, overlap_size=0)
@@ -306,7 +334,9 @@ def test_whitespace_only_gap_is_not_flagged_as_missing_coverage(make_normalized_
 
     report = validate_chunks(document, result, config)
 
-    assert not any(issue.invariant == NON_WHITESPACE_COVERAGE for issue in report.issues)
+    assert not any(
+        issue.invariant == NON_WHITESPACE_COVERAGE for issue in report.issues
+    )
 
 
 # --- invariant 5: traceability ---
@@ -424,7 +454,9 @@ def test_valid_structural_chunking_has_no_issues(make_extract_document):
         "Bob | Manager | 85\n"
     )
     document = normalize_document(make_extract_document([text]))
-    config = ChunkingConfig(max_chunk_size=60, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=60, overlap_size=0, chunking_strategy="structural"
+    )
     result = chunk_document(document, config)
 
     report = validate_chunks(document, result, config)
@@ -440,14 +472,24 @@ def test_overlapping_structural_elements_are_flagged(make_extract_document):
         page_number=1,
         text="ABCDEFGHIJ",
         blocks=[
-            NormalizedBlock(block_type="paragraph", text="ABCDE", start_char=0, end_char=5),
-            NormalizedBlock(block_type="paragraph", text="DEFGH", start_char=3, end_char=8),
+            NormalizedBlock(
+                block_type="paragraph", text="ABCDE", start_char=0, end_char=5
+            ),
+            NormalizedBlock(
+                block_type="paragraph", text="DEFGH", start_char=3, end_char=8
+            ),
         ],
     )
     document = NormalizedDocument(
-        document_id="doc1", file_name="doc1.pdf", file_path="/tmp/doc1.pdf", pages=[page], full_text="ABCDEFGHIJ"
+        document_id="doc1",
+        file_name="doc1.pdf",
+        file_path="/tmp/doc1.pdf",
+        pages=[page],
+        full_text="ABCDEFGHIJ",
     )
-    config = ChunkingConfig(max_chunk_size=100, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=100, overlap_size=0, chunking_strategy="structural"
+    )
     result = chunk_document(document, config)
 
     report = validate_chunks(document, result, config)
@@ -458,7 +500,9 @@ def test_overlapping_structural_elements_are_flagged(make_extract_document):
 
 def test_element_split_across_chunks_is_flagged(make_extract_document):
     document = normalize_document(make_extract_document(["ABCDEFGHIJ"]))
-    config = ChunkingConfig(max_chunk_size=100, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=100, overlap_size=0, chunking_strategy="structural"
+    )
     # The whole page is one paragraph element; hand-split it across two chunks,
     # which a correct structural chunker would never do for a non-oversized element.
     result = ChunkingResult(
@@ -498,7 +542,9 @@ def test_element_split_across_chunks_is_flagged(make_extract_document):
 
 def test_chunk_boundary_splitting_a_bullet_is_flagged(make_extract_document):
     document = normalize_document(make_extract_document(["- item one\n- item two"]))
-    config = ChunkingConfig(max_chunk_size=100, overlap_size=0, chunking_strategy="structural")
+    config = ChunkingConfig(
+        max_chunk_size=100, overlap_size=0, chunking_strategy="structural"
+    )
     # Cuts the first bullet in half instead of landing on an item/sentence boundary.
     result = ChunkingResult(
         document_id=document.document_id,

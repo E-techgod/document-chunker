@@ -1,11 +1,12 @@
-from pypdf import PdfReader
 from pydantic import BaseModel
+from pypdf import PdfReader
 
 from document_chunker.schemas import ExtractedDocument, ExtractedPage, PDFDocumentInput
 
 
 class PDFExtractionError(Exception):
     """Raised when a PDF's text cannot be extracted."""
+
 
 class ExtractionConfig(BaseModel):
     extraction_mode: str = "layout"
@@ -14,7 +15,7 @@ class ExtractionConfig(BaseModel):
 
 def _extract_page_text(page: object, config: ExtractionConfig) -> str:
     """Call `extract_text` with config when supported, otherwise fall back."""
-    extract_text = getattr(page, "extract_text")
+    extract_text = page.extract_text
     kwargs = config.model_dump()
 
     try:
@@ -53,7 +54,9 @@ def extract_pdf(document: PDFDocumentInput, reader: PdfReader) -> ExtractedDocum
         )
 
     if not any(page.text.strip() for page in pages):
-        raise PDFExtractionError(f"no extractable text found in document: {document.path}")
+        raise PDFExtractionError(
+            f"no extractable text found in document: {document.path}"
+        )
 
     full_text = "\n\n".join(page.text for page in pages)
 

@@ -30,7 +30,9 @@ def _tiny_chunk_count(chunks: list[DocumentChunk], max_chunk_size: int) -> int:
 def _interior_boundaries(chunks: list[DocumentChunk], text_length: int) -> list[int]:
     """Chunk start/end offsets that fall strictly inside the document, excluding its very
     first and last position - those aren't splits, they're the document's own edges."""
-    boundaries = {chunk.start_char for chunk in chunks} | {chunk.end_char for chunk in chunks}
+    boundaries = {chunk.start_char for chunk in chunks} | {
+        chunk.end_char for chunk in chunks
+    }
     boundaries.discard(0)
     boundaries.discard(text_length)
     return sorted(boundaries)
@@ -40,7 +42,9 @@ def _splits_a_word(full_text: str, boundary: int) -> bool:
     return not full_text[boundary - 1].isspace() and not full_text[boundary].isspace()
 
 
-def _classify_splits(document: NormalizedDocument, chunks: list[DocumentChunk]) -> tuple[int, int, int]:
+def _classify_splits(
+    document: NormalizedDocument, chunks: list[DocumentChunk]
+) -> tuple[int, int, int]:
     """Count chunk boundaries that cut through the interior of an atomic structural unit:
     a word (inside a heading/paragraph), a list item (bullet), or a table row. Works for
     any chunking strategy - it checks boundaries against the document's own structure, not
@@ -75,7 +79,8 @@ def _overlap_overhead(chunks: list[DocumentChunk]) -> float:
     if total_chars == 0:
         return 0.0
     redundant = sum(
-        max(0, earlier.end_char - later.start_char) for earlier, later in zip(chunks, chunks[1:])
+        max(0, earlier.end_char - later.start_char)
+        for earlier, later in zip(chunks, chunks[1:])
     )
     return redundant / total_chars
 
@@ -86,14 +91,21 @@ def _context_prefix_overhead(chunks: list[DocumentChunk]) -> float:
     total = sum(len(chunk.contextualized_text) for chunk in chunks)
     if total == 0:
         return 0.0
-    prefix_chars = sum(len(chunk.context_prefix) + 1 for chunk in chunks if chunk.context_prefix)
+    prefix_chars = sum(
+        len(chunk.context_prefix) + 1 for chunk in chunks if chunk.context_prefix
+    )
     return prefix_chars / total
 
 
-def _context_coverage(document: NormalizedDocument, chunks: list[DocumentChunk]) -> float:
+def _context_coverage(
+    document: NormalizedDocument, chunks: list[DocumentChunk]
+) -> float:
     """Of the chunks that need context to stand alone (their leading unit doesn't open on a
     heading), the share that actually received a non-empty context_prefix."""
-    unit_type_by_start = {start: block_type for start, _, block_type in document_structural_units(document)}
+    unit_type_by_start = {
+        start: block_type
+        for start, _, block_type in document_structural_units(document)
+    }
 
     needing = satisfied = 0
     for chunk in chunks:
@@ -130,7 +142,11 @@ def evaluate_chunk_quality(
         context_overhead = 0.0
         overhead_source = "none"
 
-    context_coverage = _context_coverage(document, chunks) if is_structural and config.propagate_context else None
+    context_coverage = (
+        _context_coverage(document, chunks)
+        if is_structural and config.propagate_context
+        else None
+    )
 
     return ChunkQualityReport(
         document_id=document.document_id,
@@ -186,7 +202,9 @@ def _cell(report: ChunkQualityReport, metric: str) -> str:
         suffix = "*" if report.overhead_source == "overlap" else ""
         return f"{_pct(report.context_overhead)}{suffix}"
     if metric == "Context coverage":
-        return "N/A" if report.context_coverage is None else _pct(report.context_coverage)
+        return (
+            "N/A" if report.context_coverage is None else _pct(report.context_coverage)
+        )
     raise ValueError(f"unknown metric: {metric}")
 
 
@@ -200,7 +218,9 @@ def format_quality_comparison(reports: dict[str, ChunkQualityReport]) -> str:
     label_col = max(len(metric) for metric in _METRICS) + 2
     col_width = max(max(len(label) for label in labels), 6) + 4
 
-    header = "Metric".ljust(label_col) + "".join(label.center(col_width) for label in labels)
+    header = "Metric".ljust(label_col) + "".join(
+        label.center(col_width) for label in labels
+    )
     lines = [header, "-" * len(header)]
     for metric in _METRICS:
         row = metric.ljust(label_col) + "".join(
@@ -209,6 +229,8 @@ def format_quality_comparison(reports: dict[str, ChunkQualityReport]) -> str:
         lines.append(row)
 
     if any(report.overhead_source == "overlap" for report in reports.values()):
-        lines.append("* overlap redundancy from character-based chunking, not injected context")
+        lines.append(
+            "* overlap redundancy from character-based chunking, not injected context"
+        )
 
     return "\n".join(lines)

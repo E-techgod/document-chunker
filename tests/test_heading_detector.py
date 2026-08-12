@@ -1,6 +1,5 @@
 from document_chunker.heading_detector import detect_heading_level
 
-
 # --- correct classification of structural headings ---
 
 
@@ -48,7 +47,9 @@ def test_short_title_case_section_title_is_a_heading():
 def test_all_caps_callout_with_colon_is_not_a_heading():
     # The exact example from the task spec: capitalized for emphasis, not a section
     # header, and must not be flagged as one just because it's all-caps.
-    assert detect_heading_level("CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND") is None
+    assert (
+        detect_heading_level("CRITICAL INSIGHT: GENERALISTS ARE LOSING GROUND") is None
+    )
 
 
 def test_all_caps_without_numbering_is_not_a_heading():
@@ -62,7 +63,10 @@ def test_long_all_caps_phrase_without_a_digit_is_still_not_a_heading():
 
 
 def test_all_caps_title_with_digit_still_rejected_past_the_widened_cap():
-    assert detect_heading_level("THE 2026 GLOBAL AI ML DATA ENGINEERING JOB MARKET REPORT") is None
+    assert (
+        detect_heading_level("THE 2026 GLOBAL AI ML DATA ENGINEERING JOB MARKET REPORT")
+        is None
+    )
 
 
 def test_title_case_phrase_with_lowercase_connector_word_is_not_a_heading():
@@ -77,11 +81,16 @@ def test_single_title_case_word_is_not_a_heading():
 
 
 def test_overly_long_title_case_phrase_is_not_a_heading():
-    assert detect_heading_level("Key Facts About The Current State Of The Job Market") is None
+    assert (
+        detect_heading_level("Key Facts About The Current State Of The Job Market")
+        is None
+    )
 
 
 def test_title_case_sentence_with_lowercase_words_is_not_a_heading():
-    assert detect_heading_level("This is just a normal sentence about the market") is None
+    assert (
+        detect_heading_level("This is just a normal sentence about the market") is None
+    )
 
 
 def test_title_case_table_header_row_is_not_a_heading():
@@ -92,7 +101,10 @@ def test_title_case_table_header_row_is_not_a_heading():
 
 
 def test_ordinary_sentence_starting_with_a_number_word_is_not_a_heading():
-    assert detect_heading_level("Week 2 was really hard for most students in the cohort.") is None
+    assert (
+        detect_heading_level("Week 2 was really hard for most students in the cohort.")
+        is None
+    )
 
 
 def test_list_item_prefix_is_never_a_heading():
@@ -107,7 +119,9 @@ def test_overly_long_line_is_not_a_heading_even_with_a_numbered_prefix():
 
 
 def test_plain_prose_paragraph_is_not_a_heading():
-    text = "This is just a normal paragraph of prose that happens to be reasonably short."
+    text = (
+        "This is just a normal paragraph of prose that happens to be reasonably short."
+    )
     assert detect_heading_level(text) is None
 
 

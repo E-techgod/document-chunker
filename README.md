@@ -225,7 +225,7 @@ If no arguments are provided, it defaults to `data/BAWSE.pdf`. Example output:
 ```text
 Chunk quality comparison for data/BAWSE.pdf
 
-Metric                V1       V2.1      V2.2   
+Metric                V1      V2.1      V2.2   
 ------------------------------------------------
 Valid                 ✓         ✓         ✓     
 Chunks                37        37        37    

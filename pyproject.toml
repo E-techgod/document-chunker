@@ -16,3 +16,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/document_chunker"]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "ruff>=0.16.2",
+]
