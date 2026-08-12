@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from document_chunker.extractor import extract_pdf
 from document_chunker.loader import load_pdf
@@ -315,12 +316,18 @@ def test_golden_rows_hold_through_the_full_validated_pipeline():
 # --- full suite across real, complex documents ---
 
 
-@pytest.mark.parametrize("pdf_name", ["sample.pdf", "BAWSE.pdf"])
+@pytest.mark.parametrize(
+    "pdf_name",
+    ["BAWSE.pdf", "generic.pdf", "invoice.pdf", "receipt.pdf", "report.pdf", "resume.pdf", "sample.pdf", "empty.pdf"],
+)
 def test_core_span_and_structural_invariants_hold_on_real_documents(pdf_name):
-    """Invariants 1, 2, 3, 5, 6, 7 - everything except lossless-content (invariant 4),
-    which has one known, pre-existing, minor limitation on BAWSE.pdf (see
-    test_known_limitation_pipe_separated_labels_can_misdetect_as_a_table below) and is
-    checked on its own for sample.pdf above, where it holds cleanly."""
+    """Invariants 1, 2, 3, 5, 6, 7 across the real fixture PDFs. Lossless-content
+    (invariant 4) is verified separately where needed because it is source-aware."""
+    if pdf_name == "empty.pdf":
+        with pytest.raises(ValidationError, match="file is empty"):
+            _extract(pdf_name)
+        return
+
     extracted = _extract(pdf_name)
     structured = build_structured_document(extracted)
 
@@ -328,20 +335,20 @@ def test_core_span_and_structural_invariants_hold_on_real_documents(pdf_name):
     assert issues == [], f"{pdf_name}: {issues}"
 
 
-def test_known_limitation_pipe_separated_labels_can_misdetect_as_a_table():
-    """Documents this deliberately, rather than silently ignoring it: a short label
-    line using '|' as a plain-text separator (e.g. "Week 1-2 | 5-10 hours total") can
-    coincidentally combine with an unrelated pipe-separated line (e.g. a page footer)
-    into a spurious 2-row table, since table detection has no font/position data to
-    distinguish a real table from prose that happens to use '|'. This is a pre-existing
-    limitation shared with the older normalizer.py pipeline (verified: normalize_page()
-    produces the identical result), not a regression introduced by this phase - and it
-    is exactly the kind of issue invariant 4 exists to surface, not hide."""
+def test_pipe_separated_prose_is_no_longer_misdetected_as_a_table():
+    """This used to document a known limitation: two unrelated pipe-separated lines on
+    BAWSE.pdf page 1 were glued into a fake 2-row table. The 2-row coherence check now
+    rejects that weakest-evidence case so the lines remain ordinary paragraph content."""
     extracted = _extract("BAWSE.pdf")
     structured = build_structured_document(extracted)
 
     issues = validate_structured_document(structured, source=extracted)
+    assert issues == []
 
-    assert len(issues) == 1
-    assert "content lost" in issues[0]
-    assert "'|'" in issues[0]
+    paragraph_texts = [block.text for block in structured.blocks if isinstance(block, ParagraphBlock)]
+    table_texts = [block.text for block in structured.blocks if isinstance(block, TableBlock)]
+
+    assert any("Leverage Play" in text and "domain knowledge" in text for text in paragraph_texts)
+    assert any("Updated June 2026" in text and "BASWE LLC" in text for text in paragraph_texts)
+    assert all("Leverage Play | domain knowledge" not in text for text in table_texts)
+    assert all("Updated June 2026 | baswe.Ai Engineer Accelerator™ | BASWE LLC" not in text for text in table_texts)
