@@ -1,4 +1,4 @@
-from document_chunker.heading_detector import detect_heading_level
+from src.document_chunker.heading_detector import detect_heading_level
 
 # --- correct classification of structural headings ---
 

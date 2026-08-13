@@ -2,10 +2,10 @@ import itertools
 import re
 from collections import Counter
 
-from document_chunker.list_detector import match_list_item
-from document_chunker.paragraph_normalizer import build_structured_document
-from document_chunker.schemas import ExtractedDocument
-from document_chunker.structured_models import (
+from src.document_chunker.list_detector import match_list_item
+from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.schemas import ExtractedDocument
+from src.document_chunker.structured_models import (
     ListBlock,
     NormalizedBlock,
     StructuredNormalizedDocument,

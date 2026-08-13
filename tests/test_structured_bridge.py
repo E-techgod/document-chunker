@@ -2,20 +2,20 @@ from pathlib import Path
 
 import pytest
 
-from document_chunker.chunker import chunk_document
-from document_chunker.chunking_strategies import get_chunking_strategy
-from document_chunker.evaluator import validate_chunks
-from document_chunker.extractor import extract_pdf
-from document_chunker.loader import load_pdf
-from document_chunker.paragraph_normalizer import build_structured_document
-from document_chunker.schemas import (
+from src.document_chunker.chunker import chunk_document
+from src.document_chunker.chunking_strategies import get_chunking_strategy
+from src.document_chunker.evaluator import validate_chunks
+from src.document_chunker.extractor import extract_pdf
+from src.document_chunker.loader import load_pdf
+from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.schemas import (
     ChunkingConfig,
     ExtractedDocument,
     ExtractedPage,
     PDFDocumentInput,
 )
-from document_chunker.structured_bridge import to_normalized_document
-from document_chunker.structured_models import (
+from src.document_chunker.structured_bridge import to_normalized_document
+from src.document_chunker.structured_models import (
     HeadingBlock,
     ListBlock,
     PageFooterBlock,

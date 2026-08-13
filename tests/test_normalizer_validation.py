@@ -4,15 +4,15 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from document_chunker.extractor import extract_pdf
-from document_chunker.loader import load_pdf
-from document_chunker.paragraph_normalizer import build_structured_document
-from document_chunker.schemas import ExtractedDocument, ExtractedPage, PDFDocumentInput
-from document_chunker.step2_pipeline import (
+from src.document_chunker.extractor import extract_pdf
+from src.document_chunker.loader import load_pdf
+from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.schemas import ExtractedDocument, ExtractedPage, PDFDocumentInput
+from src.document_chunker.step2_pipeline import (
     normalize_document,
     validate_structured_document,
 )
-from document_chunker.structured_models import (
+from src.document_chunker.structured_models import (
     HeadingBlock,
     ListBlock,
     PageFooterBlock,
@@ -277,7 +277,7 @@ def test_normalize_document_returns_a_validated_structured_document():
 
 
 def test_normalize_document_raises_with_all_violations_when_invalid(monkeypatch):
-    import document_chunker.step2_pipeline as pipeline
+    import src.document_chunker.step2_pipeline as pipeline
 
     def _broken_build(document):
         structured = build_structured_document(document)

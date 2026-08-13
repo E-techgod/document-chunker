@@ -1,11 +1,11 @@
-from document_chunker.list_detector import match_list_item
-from document_chunker.normalizer import (
+from src.document_chunker.list_detector import match_list_item
+from src.document_chunker.normalizer import (
     _classify_line,
     _is_table_candidate,
     _render_table_block,
 )
-from document_chunker.schemas import NormalizedTable
-from document_chunker.table_normalizer import TableNormalizer
+from src.document_chunker.schemas import NormalizedTable
+from src.document_chunker.table_normalizer import TableNormalizer
 
 # Phase 5 of the Step 2 redesign: table region parsing for paragraph_normalizer's
 # _split_into_blocks. Row/cell reconstruction (column inference, wrapped-cell merging,

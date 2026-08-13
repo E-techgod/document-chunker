@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 
-from document_chunker.schemas import (
+from src.document_chunker.schemas import (
     ExtractedDocument,
     ExtractedPage,
     NormalizationStrategy,
@@ -462,7 +462,7 @@ def _build_table(
     logical row they continue, and emitting complete rows in order. Imported locally to
     avoid a circular import (table_normalizer.py reuses this module's line-parsing
     helpers)."""
-    from document_chunker.table_normalizer import TableNormalizer
+    from src.document_chunker.table_normalizer import TableNormalizer
 
     return TableNormalizer().build(lines, start_index)
 

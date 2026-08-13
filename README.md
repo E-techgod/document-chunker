@@ -15,13 +15,41 @@ This is not just "text extraction" anymore. The current codebase includes:
 - chunk quality evaluation and cross-strategy comparison tooling
 - generated graph reports for codebase inspection
 
+## Install / Setup
+
+Requirements:
+
+- Python `>=3.14`
+- [`uv`](https://docs.astral.sh/uv/) for dependency management and running scripts
+
+```bash
+git clone https://github.com/E-techgod/document-chunker
+cd document-chunker
+uv sync
+```
+
+`uv sync` creates a `.venv`, installs the pinned dependencies from `uv.lock` (`pydantic`, `pypdf`, `pytest`, plus the `black`/`ruff` dev group, included by default), and installs `document-chunker` itself in editable mode. That editable install registers two console scripts (defined in `pyproject.toml`) that `uv run` can invoke from anywhere in the repo:
+
+```bash
+uv run chunk [path/to/file.pdf] [password] 
+uv run compare-strategies [path/to/file.pdf] [password]
+
+# Using installed CLI
+chunk <path/to/file.pdf> [password]
+
+# Using uv
+uv run chunk <path/to/file.pdf> [password]
+```
+
+Both default to `data/BAWSE.pdf` when no path is given. See [Running It](#running-it) and [Comparing Chunking Strategies](#comparing-chunking-strategies) below for what each command does.
+
 ## Architecture
 
 The generated graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`, and `graphify-out/graph.html` currently reports:
 
-- `693` nodes
-- `1607` edges
-- `28` communities
+- `699` nodes
+- `1955` edges
+- `60` communities
 - no import cycles detected
 
 ```mermaid
@@ -60,7 +88,8 @@ flowchart LR
     heading["heading_detector.py"]
     listd["list_detector.py"]
     noise["noise_detector.py"]
-    paragraph["paragraph_normalizer.py"]
+    normalizer["normalizer.py
+    shared text-cleanup regexes"]
     table_norm["table_normalizer.py"]
     table_parse["table_parser.py"]
     structured_models["structured_models.py"]
@@ -87,9 +116,12 @@ flowchart LR
   structured --> heading
   structured --> listd
   structured --> noise
-  structured --> table_norm
+  structured --> normalizer
   structured --> table_parse
-  structured_models --> step2
+  structured --> structured_models
+  table_parse --> table_norm
+  bridge --> normalizer
+  step2 --> structured_models
 
   tests --> core
   tests --> helpers
@@ -162,9 +194,9 @@ flowchart TD
 ## Repository Shape
 
 ```text
-main.py
-compare_strategies.py
 src/document_chunker/
+  main.py
+  compare_strategies.py
   chunker.py
   chunking_strategies.py
   counting.py
@@ -197,7 +229,7 @@ At a high level:
 ## Running It
 
 ```bash
-uv run main.py [path/to/file.pdf] [password]
+uv run chunk [path/to/file.pdf] [password]
 ```
 
 If no arguments are provided, `main.py` defaults to `data/BAWSE.pdf`.
@@ -217,7 +249,7 @@ The runner currently:
 `compare_strategies.py` runs the same document through all three chunking strategies (`v1.0`, `v2.1`, `v2.2`) and prints a side-by-side quality comparison built on `evaluate_chunk_quality()`:
 
 ```bash
-uv run compare_strategies.py [path/to/file.pdf] [password]
+uv run compare-strategies [path/to/file.pdf] [password]
 ```
 
 If no arguments are provided, it defaults to `data/BAWSE.pdf`. Example output:
@@ -285,4 +317,4 @@ Regenerate the graph with:
 graphify update .
 ```
 
-The current report was generated on `2026-08-12` and records commit `b2ca871f` as its source snapshot.
+The current report was generated on `2026-08-12` and records commit `96ffac05` as its source snapshot.

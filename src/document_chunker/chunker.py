@@ -2,8 +2,8 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
 
-from document_chunker.counting import count_words
-from document_chunker.schemas import (
+from src.document_chunker.counting import count_words
+from src.document_chunker.schemas import (
     ChunkingConfig,
     ChunkingResult,
     DocumentChunk,

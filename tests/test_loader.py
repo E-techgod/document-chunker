@@ -2,8 +2,8 @@ import pytest
 from pydantic import ValidationError
 from pypdf import PdfWriter
 
-from document_chunker.loader import PDFLoadError, load_pdf
-from document_chunker.schemas import PDFDocumentInput
+from src.document_chunker.loader import PDFLoadError, load_pdf
+from src.document_chunker.schemas import PDFDocumentInput
 
 # --- PDFDocumentInput ---
 

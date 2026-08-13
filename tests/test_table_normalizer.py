@@ -1,5 +1,5 @@
-from document_chunker.normalizer import normalize_page
-from document_chunker.schemas import ExtractedPage
+from src.document_chunker.normalizer import normalize_page
+from src.document_chunker.schemas import ExtractedPage
 
 
 def test_wrapped_last_column_merges_into_the_same_cell():

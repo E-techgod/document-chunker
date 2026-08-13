@@ -1,12 +1,12 @@
-from document_chunker.counting import count_words
-from document_chunker.normalizer import (
+from src.document_chunker.counting import count_words
+from src.document_chunker.normalizer import (
     DEFAULT_NORMALIZATION_STRATEGY,
     normalize_document,
     normalize_page,
     normalize_text,
     repair_line_wraps,
 )
-from document_chunker.schemas import ExtractedPage, NormalizedDocument
+from src.document_chunker.schemas import ExtractedPage, NormalizedDocument
 
 
 # --- normalize_text: one test per rule ---

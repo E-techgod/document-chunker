@@ -1,8 +1,8 @@
 import pytest
 
-from document_chunker.chunker import chunk_document
-from document_chunker.normalizer import normalize_document
-from document_chunker.schemas import ChunkingConfig
+from src.document_chunker.chunker import chunk_document
+from src.document_chunker.normalizer import normalize_document
+from src.document_chunker.schemas import ChunkingConfig
 
 # --- happy path ---
 

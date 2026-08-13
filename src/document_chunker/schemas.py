@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
-from document_chunker.counting import count_words
+from src.document_chunker.counting import count_words
 
 NormalizationStrategy = Literal[
     "characters",

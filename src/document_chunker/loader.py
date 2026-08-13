@@ -1,7 +1,7 @@
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-from document_chunker.schemas import PDFDocumentInput
+from src.document_chunker.schemas import PDFDocumentInput
 
 
 class PDFLoadError(Exception):

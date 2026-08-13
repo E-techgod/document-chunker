@@ -1,9 +1,9 @@
 import re
 
-from document_chunker.paragraph_normalizer import build_structured_document
-from document_chunker.schemas import ExtractedDocument, ExtractedPage
-from document_chunker.step2_pipeline import validate_structured_document
-from document_chunker.structured_models import (
+from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.schemas import ExtractedDocument, ExtractedPage
+from src.document_chunker.step2_pipeline import validate_structured_document
+from src.document_chunker.structured_models import (
     HeadingBlock,
     ListBlock,
     PageFooterBlock,
