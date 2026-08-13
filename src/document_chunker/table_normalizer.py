@@ -1,6 +1,6 @@
 import re
 
-from document_chunker.normalizer import (
+from src.document_chunker.normalizer import (
     ClassifiedLine,
     _append_wrapped_table_text,
     _looks_like_header_row,
@@ -8,7 +8,7 @@ from document_chunker.normalizer import (
     _normalize_inline_text,
     _parse_table_row,
 )
-from document_chunker.schemas import NormalizedBlock, NormalizedTable
+from src.document_chunker.schemas import NormalizedBlock, NormalizedTable
 
 _COLUMN_GAP_RE = re.compile(r"\s{2,}")
 

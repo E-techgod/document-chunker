@@ -1,12 +1,12 @@
 import itertools
 
-from document_chunker.chunker import (
+from src.document_chunker.chunker import (
     STRUCTURAL_STRATEGY,
     oversized_table_header_pairs,
     structural_elements,
     structural_pieces,
 )
-from document_chunker.schemas import (
+from src.document_chunker.schemas import (
     ChunkingConfig,
     ChunkingResult,
     ChunkValidationIssue,

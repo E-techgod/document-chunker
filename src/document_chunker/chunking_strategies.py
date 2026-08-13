@@ -1,4 +1,4 @@
-from document_chunker.schemas import ChunkingConfig
+from src.document_chunker.schemas import ChunkingConfig
 
 CHUNKING_STRATEGIES = {
     "v1.0": {

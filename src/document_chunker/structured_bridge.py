@@ -1,19 +1,19 @@
 import itertools
 import re
 
-from document_chunker.normalizer import (
+from src.document_chunker.normalizer import (
     _EXCESS_BLANK_LINES_RE,
     BlockEntry,
     _render_blocks,
 )
-from document_chunker.schemas import (
+from src.document_chunker.schemas import (
     ExtractedDocument,
     NormalizedDocument,
     NormalizedPage,
     NormalizedTable,
 )
-from document_chunker.schemas import NormalizedBlock as SchemaBlock
-from document_chunker.structured_models import (
+from src.document_chunker.schemas import NormalizedBlock as SchemaBlock
+from src.document_chunker.structured_models import (
     AnyBlock,
     HeadingBlock,
     ListBlock,

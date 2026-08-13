@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 
-from document_chunker.schemas import (
+from src.document_chunker.schemas import (
     ExtractedDocument,
     ExtractedPage,
     NormalizationStrategy,
