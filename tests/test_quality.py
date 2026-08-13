@@ -174,6 +174,38 @@ def test_structural_with_context_carry_reports_overhead_and_full_coverage(
     assert report.context_coverage == 1.0
 
 
+def test_context_coverage_exempts_the_documents_opening_paragraph(make_extract_document):
+    """The document's very first structural unit has no governing heading and no previous
+    unit to fall back on, so _resolve_context_prefix() legitimately has nothing to attach -
+    even a fully working pipeline can't give it a context_prefix. _context_coverage() exempts
+    that opening chunk the same way it exempts heading-opening chunks, rather than counting
+    it as a miss no fix could ever satisfy. Every later chunk that opens without its own
+    heading is still held to the normal standard."""
+    text = (
+        "This is a simple paragraph explaining something in detail for testing purposes.\n\n"
+        "IMPORTANT NOTICE\n\n"
+        "This is a simple paragraph explaining something in detail for testing purposes.\n\n"
+    )
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(
+        max_chunk_size=40,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
+    result = chunk_document(document, config)
+
+    report = evaluate_chunk_quality(document, result, config)
+
+    opening_chunk, heading_chunk, later_chunk = result.chunks
+    assert opening_chunk.context_prefix == ""  # no heading exists yet - exempt, not a miss
+    assert heading_chunk.context_prefix == ""  # opens on its own heading - exempt, not a miss
+    assert later_chunk.context_prefix == "IMPORTANT NOTICE"  # heading now exists - satisfied
+
+    # Only later_chunk needs context; it got one, so coverage is full.
+    assert report.context_coverage == 1.0
+
+
 # --- validity delegates to the existing validator ---
 
 
