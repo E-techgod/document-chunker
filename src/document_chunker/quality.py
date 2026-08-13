@@ -102,14 +102,18 @@ def _context_coverage(
     document: NormalizedDocument, chunks: list[DocumentChunk]
 ) -> float:
     """Of the chunks that need context to stand alone (their leading unit doesn't open on a
-    heading), the share that actually received a non-empty context_prefix."""
-    unit_type_by_start = {
-        start: block_type
-        for start, _, block_type in document_structural_units(document)
-    }
+    heading, and isn't the document's own opening unit - there's no governing heading yet
+    and no previous chunk to fall back on, so _resolve_context_prefix() has nothing to
+    attach even in a fully working pipeline), the share that actually received a non-empty
+    context_prefix."""
+    units = document_structural_units(document)
+    unit_type_by_start = {start: block_type for start, _, block_type in units}
+    document_start = units[0][0] if units else None
 
     needing = satisfied = 0
     for chunk in chunks:
+        if chunk.start_char == document_start:
+            continue  # opens the document itself - no prior heading exists to draw from
         if unit_type_by_start.get(chunk.start_char) == "heading":
             continue  # opens fresh on its own heading, doesn't need a prefix
         needing += 1
