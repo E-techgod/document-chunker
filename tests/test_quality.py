@@ -1,6 +1,9 @@
-from src.document_chunker.chunker import chunk_document
-from src.document_chunker.normalizer import normalize_document
-from src.document_chunker.quality import evaluate_chunk_quality, format_quality_comparison
+from src.document_chunker.chunking.chunker import chunk_document
+from src.document_chunker.chunking.quality import (
+    evaluate_chunk_quality,
+    format_quality_comparison,
+)
+from src.document_chunker.normalization.normalizer import normalize_document
 from src.document_chunker.schemas import ChunkingConfig
 
 

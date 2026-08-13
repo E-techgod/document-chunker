@@ -2,20 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from src.document_chunker.chunker import chunk_document
-from src.document_chunker.chunking_strategies import get_chunking_strategy
-from src.document_chunker.evaluator import validate_chunks
-from src.document_chunker.extractor import extract_pdf
-from src.document_chunker.loader import load_pdf
-from src.document_chunker.paragraph_normalizer import build_structured_document
-from src.document_chunker.schemas import (
-    ChunkingConfig,
-    ExtractedDocument,
-    ExtractedPage,
-    PDFDocumentInput,
+from src.document_chunker.chunking.chunker import chunk_document
+from src.document_chunker.chunking.chunking_strategies import get_chunking_strategy
+from src.document_chunker.chunking.evaluator import validate_chunks
+from src.document_chunker.io.extractor import extract_pdf
+from src.document_chunker.io.loader import load_pdf
+from src.document_chunker.normalization.paragraph_normalizer import (
+    build_structured_document,
 )
-from src.document_chunker.structured_bridge import to_normalized_document
-from src.document_chunker.structured_models import (
+from src.document_chunker.normalization.structured_bridge import to_normalized_document
+from src.document_chunker.normalization.structured_models import (
     HeadingBlock,
     ListBlock,
     PageFooterBlock,
@@ -23,6 +19,12 @@ from src.document_chunker.structured_models import (
     ParagraphBlock,
     StructuredNormalizedDocument,
     TableBlock,
+)
+from src.document_chunker.schemas import (
+    ChunkingConfig,
+    ExtractedDocument,
+    ExtractedPage,
+    PDFDocumentInput,
 )
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"

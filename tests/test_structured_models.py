@@ -3,7 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from src.document_chunker.structured_models import (
+from src.document_chunker.normalization.structured_models import (
     HeadingBlock,
     ListBlock,
     PageFooterBlock,

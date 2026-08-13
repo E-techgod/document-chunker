@@ -1,6 +1,6 @@
 import re
 
-from src.document_chunker.normalizer import (
+from src.document_chunker.normalization.normalizer import (
     ClassifiedLine,
     _append_wrapped_table_text,
     _looks_like_header_row,

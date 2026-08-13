@@ -2,16 +2,18 @@ import re
 from dataclasses import dataclass, field
 from typing import Literal
 
-from src.document_chunker.heading_detector import detect_heading_level
-from src.document_chunker.list_detector import is_continuation_line, match_list_item
-from src.document_chunker.noise_detector import detect_noise_lines
-from src.document_chunker.normalizer import (
+from src.document_chunker.normalization.heading_detector import detect_heading_level
+from src.document_chunker.normalization.list_detector import (
+    is_continuation_line,
+    match_list_item,
+)
+from src.document_chunker.normalization.noise_detector import detect_noise_lines
+from src.document_chunker.normalization.normalizer import (
     _HORIZONTAL_WHITESPACE_RE,
     _measure_indent,
     _preprocess_text,
 )
-from src.document_chunker.schemas import ExtractedDocument
-from src.document_chunker.structured_models import (
+from src.document_chunker.normalization.structured_models import (
     HeadingBlock,
     ListBlock,
     PageFooterBlock,
@@ -20,7 +22,11 @@ from src.document_chunker.structured_models import (
     StructuredNormalizedDocument,
     TableBlock,
 )
-from src.document_chunker.table_parser import is_table_row_candidate, parse_table_region
+from src.document_chunker.normalization.table_parser import (
+    is_table_row_candidate,
+    parse_table_region,
+)
+from src.document_chunker.schemas import ExtractedDocument
 
 # Phase 2/3/4/5 of the Step 2 "Normalize + Preserve Structure" redesign: paragraph,
 # heading, list, and table reconstruction with baseline span calculation, built on

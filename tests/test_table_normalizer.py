@@ -1,4 +1,4 @@
-from src.document_chunker.normalizer import normalize_page
+from src.document_chunker.normalization.normalizer import normalize_page
 from src.document_chunker.schemas import ExtractedPage
 
 

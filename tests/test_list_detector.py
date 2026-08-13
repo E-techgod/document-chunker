@@ -1,4 +1,7 @@
-from src.document_chunker.list_detector import is_continuation_line, match_list_item
+from src.document_chunker.normalization.list_detector import (
+    is_continuation_line,
+    match_list_item,
+)
 
 # --- marker recognition and prefix stripping ---
 

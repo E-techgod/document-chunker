@@ -1,7 +1,11 @@
 from pydantic import BaseModel
 from pypdf import PdfReader
 
-from src.document_chunker.schemas import ExtractedDocument, ExtractedPage, PDFDocumentInput
+from src.document_chunker.schemas import (
+    ExtractedDocument,
+    ExtractedPage,
+    PDFDocumentInput,
+)
 
 
 class PDFExtractionError(Exception):

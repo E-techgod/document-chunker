@@ -1,4 +1,4 @@
-from src.document_chunker.noise_detector import detect_noise_lines
+from src.document_chunker.normalization.noise_detector import detect_noise_lines
 
 # Every page below uses at least 4 lines so the header zone (first `zone_size` non-blank
 # lines) and footer zone (last `zone_size` non-blank lines) never overlap at the default
