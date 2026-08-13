@@ -206,6 +206,43 @@ def test_context_coverage_exempts_the_documents_opening_paragraph(make_extract_d
     assert report.context_coverage == 1.0
 
 
+def test_context_coverage_still_catches_a_real_miss(make_extract_document):
+    """Guards against the opening-chunk exemption above being (or becoming) too broad: a
+    coverage metric that's stuck at 1.0 regardless of input is worthless. Take a document
+    that legitimately scores 100% (it opens on a heading, so the exemption never applies),
+    then simulate a real V2.2 regression by blanking one interior chunk's context_prefix -
+    coverage must drop."""
+    text = (
+        "IMPORTANT NOTICE\n\n"
+        "This is a simple paragraph explaining something in detail for testing purposes.\n\n"
+        "ANOTHER SECTION\n\n"
+        "This is a simple paragraph explaining something in detail for testing purposes.\n\n"
+    )
+    document = _normalized(make_extract_document, [text])
+    config = ChunkingConfig(
+        max_chunk_size=40,
+        overlap_size=0,
+        chunking_strategy="structural",
+        propagate_context=True,
+    )
+    result = chunk_document(document, config)
+    baseline_report = evaluate_chunk_quality(document, result, config)
+    assert baseline_report.context_coverage == 1.0  # sanity: nothing exempt-related in play
+
+    chunks = list(result.chunks)
+    victim_index = next(
+        i for i, chunk in enumerate(chunks) if i != 0 and chunk.context_prefix
+    )
+    chunks[victim_index] = chunks[victim_index].model_copy(
+        update={"context_prefix": ""}
+    )
+    mutated_result = result.model_copy(update={"chunks": chunks})
+
+    mutated_report = evaluate_chunk_quality(document, mutated_result, config)
+
+    assert mutated_report.context_coverage < baseline_report.context_coverage
+
+
 # --- validity delegates to the existing validator ---
 
 
