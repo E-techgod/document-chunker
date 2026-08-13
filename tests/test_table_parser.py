@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from document_chunker.extractor import extract_pdf
-from document_chunker.loader import load_pdf
-from document_chunker.paragraph_normalizer import build_structured_document
-from document_chunker.schemas import PDFDocumentInput
-from document_chunker.structured_models import TableBlock
-from document_chunker.table_parser import is_table_row_candidate, parse_table_region
+from src.document_chunker.extractor import extract_pdf
+from src.document_chunker.loader import load_pdf
+from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.schemas import PDFDocumentInput
+from src.document_chunker.structured_models import TableBlock
+from src.document_chunker.table_parser import is_table_row_candidate, parse_table_region
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -211,7 +211,7 @@ def test_span_invariant_holds_for_table_blocks_in_real_documents():
 
 
 def test_table_block_sits_between_surrounding_heading_and_paragraph():
-    from document_chunker.schemas import ExtractedDocument, ExtractedPage
+    from src.document_chunker.schemas import ExtractedDocument, ExtractedPage
 
     text = "STEP 1\nName  Role  Score\nAna  Engineer  98\n\nClosing paragraph text."
     document = ExtractedDocument(

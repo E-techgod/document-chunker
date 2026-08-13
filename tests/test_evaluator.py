@@ -1,6 +1,6 @@
 
-from document_chunker.chunker import chunk_document
-from document_chunker.evaluator import (
+from src.document_chunker.chunker import chunk_document
+from src.document_chunker.evaluator import (
     ATOMIC_ELEMENT_COVERAGE,
     ELEMENT_ORDER,
     MAX_SIZE,
@@ -12,8 +12,8 @@ from document_chunker.evaluator import (
     TRACEABILITY,
     validate_chunks,
 )
-from document_chunker.normalizer import normalize_document
-from document_chunker.schemas import (
+from src.document_chunker.normalizer import normalize_document
+from src.document_chunker.schemas import (
     ChunkingConfig,
     ChunkingResult,
     DocumentChunk,

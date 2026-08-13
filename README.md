@@ -33,6 +33,12 @@ uv sync
 ```bash
 uv run chunk [path/to/file.pdf] [password] 
 uv run compare-strategies [path/to/file.pdf] [password]
+
+# Using installed CLI
+chunk <path/to/file.pdf> [password]
+
+# Using uv
+uv run chunk <path/to/file.pdf> [password]
 ```
 
 Both default to `data/BAWSE.pdf` when no path is given. See [Running It](#running-it) and [Comparing Chunking Strategies](#comparing-chunking-strategies) below for what each command does.

@@ -1,8 +1,8 @@
 import pytest
 from pypdf import PdfWriter
 
-from document_chunker.normalizer import normalize_document
-from document_chunker.schemas import (
+from src.document_chunker.normalizer import normalize_document
+from src.document_chunker.schemas import (
     ExtractedDocument,
     ExtractedPage,
     NormalizedDocument,
