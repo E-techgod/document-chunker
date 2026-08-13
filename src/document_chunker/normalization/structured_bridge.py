@@ -1,10 +1,18 @@
 import itertools
 import re
 
-from src.document_chunker.normalizer import (
+from src.document_chunker.normalization.normalizer import (
     _EXCESS_BLANK_LINES_RE,
     BlockEntry,
     _render_blocks,
+)
+from src.document_chunker.normalization.structured_models import (
+    AnyBlock,
+    HeadingBlock,
+    ListBlock,
+    ParagraphBlock,
+    StructuredNormalizedDocument,
+    TableBlock,
 )
 from src.document_chunker.schemas import (
     ExtractedDocument,
@@ -13,14 +21,6 @@ from src.document_chunker.schemas import (
     NormalizedTable,
 )
 from src.document_chunker.schemas import NormalizedBlock as SchemaBlock
-from src.document_chunker.structured_models import (
-    AnyBlock,
-    HeadingBlock,
-    ListBlock,
-    ParagraphBlock,
-    StructuredNormalizedDocument,
-    TableBlock,
-)
 
 # Bridges Step 2 (paragraph_normalizer.build_structured_document, noise-aware) into the
 # NormalizedDocument shape chunker.py/evaluator.py already consume unchanged - those two

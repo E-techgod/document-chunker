@@ -3,18 +3,22 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from src.document_chunker.chunker import chunk_document
-from src.document_chunker.chunking_strategies import (
+from src.document_chunker.chunking.chunker import chunk_document
+from src.document_chunker.chunking.chunking_strategies import (
     describe_chunking,
     get_chunking_strategy,
 )
-from src.document_chunker.evaluator import validate_chunks
-from src.document_chunker.extractor import PDFExtractionError, extract_pdf
-from src.document_chunker.loader import PDFLoadError, load_pdf
-from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.chunking.evaluator import validate_chunks
+from src.document_chunker.io.extractor import PDFExtractionError, extract_pdf
+from src.document_chunker.io.loader import PDFLoadError, load_pdf
+from src.document_chunker.normalization.paragraph_normalizer import (
+    build_structured_document,
+)
+from src.document_chunker.normalization.step2_pipeline import (
+    validate_structured_document,
+)
+from src.document_chunker.normalization.structured_bridge import to_normalized_document
 from src.document_chunker.schemas import PDFDocumentInput
-from src.document_chunker.step2_pipeline import validate_structured_document
-from src.document_chunker.structured_bridge import to_normalized_document
 
 ACTIVE_CHUNKING_STRATEGY = "v2.2"  # v1.0: character chunking with overlap, v2.1: structural chunking with no context carry, v2.2: structural chunking with context carry
 

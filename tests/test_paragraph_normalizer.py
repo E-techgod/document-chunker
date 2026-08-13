@@ -1,15 +1,19 @@
 import re
 
-from src.document_chunker.paragraph_normalizer import build_structured_document
-from src.document_chunker.schemas import ExtractedDocument, ExtractedPage
-from src.document_chunker.step2_pipeline import validate_structured_document
-from src.document_chunker.structured_models import (
+from src.document_chunker.normalization.paragraph_normalizer import (
+    build_structured_document,
+)
+from src.document_chunker.normalization.step2_pipeline import (
+    validate_structured_document,
+)
+from src.document_chunker.normalization.structured_models import (
     HeadingBlock,
     ListBlock,
     PageFooterBlock,
     PageHeaderBlock,
     ParagraphBlock,
 )
+from src.document_chunker.schemas import ExtractedDocument, ExtractedPage
 
 
 def _document(texts: list[str], document_id: str = "doc1") -> ExtractedDocument:

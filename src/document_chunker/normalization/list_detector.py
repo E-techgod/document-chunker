@@ -1,6 +1,6 @@
 import re
 
-from src.document_chunker.normalizer import _measure_indent
+from src.document_chunker.normalization.normalizer import _measure_indent
 
 # Phase 4 of the Step 2 redesign: list-item detection for paragraph_normalizer's
 # _split_into_blocks. Like heading detection (Phase 3), there's no font/coordinate

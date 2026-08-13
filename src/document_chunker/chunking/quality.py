@@ -1,8 +1,8 @@
 import itertools
 from bisect import bisect_right
 
-from src.document_chunker.chunker import document_structural_units
-from src.document_chunker.evaluator import validate_chunks
+from src.document_chunker.chunking.chunker import document_structural_units
+from src.document_chunker.chunking.evaluator import validate_chunks
 from src.document_chunker.schemas import (
     ChunkingConfig,
     ChunkingResult,

@@ -1,6 +1,6 @@
 import itertools
 
-from src.document_chunker.chunker import (
+from src.document_chunker.chunking.chunker import (
     STRUCTURAL_STRATEGY,
     oversized_table_header_pairs,
     structural_elements,

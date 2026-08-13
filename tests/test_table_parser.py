@@ -1,11 +1,16 @@
 from pathlib import Path
 
-from src.document_chunker.extractor import extract_pdf
-from src.document_chunker.loader import load_pdf
-from src.document_chunker.paragraph_normalizer import build_structured_document
+from src.document_chunker.io.extractor import extract_pdf
+from src.document_chunker.io.loader import load_pdf
+from src.document_chunker.normalization.paragraph_normalizer import (
+    build_structured_document,
+)
+from src.document_chunker.normalization.structured_models import TableBlock
+from src.document_chunker.normalization.table_parser import (
+    is_table_row_candidate,
+    parse_table_region,
+)
 from src.document_chunker.schemas import PDFDocumentInput
-from src.document_chunker.structured_models import TableBlock
-from src.document_chunker.table_parser import is_table_row_candidate, parse_table_region
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 

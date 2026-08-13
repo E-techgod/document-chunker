@@ -54,7 +54,7 @@ The generated graph in `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.json`
 
 ```mermaid
 flowchart LR
-  main["main.py"]
+  main["cli/main.py"]
   data["data/ PDFs"]
   graphify["graphify-out/
   GRAPH_REPORT.md
@@ -66,25 +66,25 @@ flowchart LR
   subgraph core["src/document_chunker"]
     schemas["schemas.py
     shared models + chunking config"]
-    loader["loader.py
+    loader["io/loader.py
     PDF loading"]
-    extractor["extractor.py
+    extractor["io/extractor.py
     text extraction"]
-    structured["paragraph_normalizer.py
+    structured["normalization/paragraph_normalizer.py
     structured reconstruction"]
-    step2["step2_pipeline.py
+    step2["normalization/step2_pipeline.py
     structured validation"]
-    bridge["structured_bridge.py
+    bridge["normalization/structured_bridge.py
     bridge to normalized model"]
-    chunker["chunker.py
+    chunker["chunking/chunker.py
     chunk generation"]
-    evaluator["evaluator.py
+    evaluator["chunking/evaluator.py
     chunk validation"]
-    strategies["chunking_strategies.py
+    strategies["chunking/chunking_strategies.py
     strategy selection"]
   end
 
-  subgraph helpers["Structured helpers"]
+  subgraph helpers["normalization/ helpers"]
     heading["heading_detector.py"]
     listd["list_detector.py"]
     noise["noise_detector.py"]
@@ -195,26 +195,34 @@ flowchart TD
 
 ```text
 src/document_chunker/
-  main.py
-  compare_strategies.py
-  chunker.py
-  chunking_strategies.py
-  counting.py
-  evaluator.py
-  extractor.py
-  heading_detector.py
-  list_detector.py
-  loader.py
-  noise_detector.py
-  normalizer.py
-  paragraph_normalizer.py
-  quality.py
-  schemas.py
-  step2_pipeline.py
-  structured_bridge.py
-  structured_models.py
-  table_normalizer.py
-  table_parser.py
+  schemas.py                    # shared pydantic models + chunking config
+  counting.py                   # word-counting utility used across stages
+
+  io/                           # PDF ingestion
+    loader.py
+    extractor.py
+
+  normalization/                # extracted text -> structured -> normalized document
+    normalizer.py
+    heading_detector.py
+    list_detector.py
+    noise_detector.py
+    table_parser.py
+    table_normalizer.py
+    paragraph_normalizer.py
+    structured_models.py
+    structured_bridge.py
+    step2_pipeline.py
+
+  chunking/                     # normalized document -> chunks -> quality/validity
+    chunker.py
+    chunking_strategies.py
+    evaluator.py
+    quality.py
+
+  cli/                          # entry points (`chunk`, `compare-strategies`)
+    main.py
+    compare_strategies.py
 tests/
 graphify-out/
 data/
@@ -224,6 +232,9 @@ At a high level:
 
 - the core story is still validate -> extract -> reconstruct -> chunk -> verify
 - the repo now has a real structured-document layer, not just flattened normalized text
+- `src/document_chunker/` is grouped into four stage-based subpackages (`io/`, `normalization/`,
+  `chunking/`, `cli/`) plus the two shared modules every stage depends on (`schemas.py`,
+  `counting.py`) — the folder boundaries mirror the pipeline stages below, not an arbitrary split
 - the tests are split across stage behavior, structural reconstruction, and invariant enforcement
 
 ## Running It
@@ -267,11 +278,11 @@ Word splits           14        0         0
 Bullet splits         41        0         0     
 Table-row splits      9         0         0     
 Context overhead     10%*       0%        2%    
-Context coverage     N/A       N/A       97%    
+Context coverage     N/A       N/A       100%   
 * overlap redundancy from character-based chunking, not injected context
 ```
 
-`v2.2` (structural chunking with context carry) is the only strategy that avoids splitting words, bullets, and table rows while still tracking near-complete context coverage — the tradeoff for `v1.0`'s higher raw utilization is the loss of structural integrity.
+`v2.2` (structural chunking with context carry) is the only strategy that avoids splitting words, bullets, and table rows while still tracking full context coverage — the tradeoff for `v1.0`'s higher raw utilization is the loss of structural integrity.
 
 ## Tests
 

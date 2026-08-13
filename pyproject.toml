@@ -24,8 +24,8 @@ dev = [
 ]
 
 [project.scripts]
-chunk = "src.document_chunker.main:main"
-compare-strategies = "src.document_chunker.compare_strategies:main"
+chunk = "src.document_chunker.cli.main:main"
+compare-strategies = "src.document_chunker.cli.compare_strategies:main"
 
 [tool.uv]
 package = true
